@@ -1,38 +1,32 @@
-import os
+import time
 
-# Constants for game configuration
+RETRY_LIMIT = 5
+RETRY_BACKOFF = 2
 
-# Game states
-INITIALIZING = 'initializing'
-RUNNING = 'running'
-PAUSED = 'paused'
-GAME_OVER = 'game_over'
+class NetworkRetries:
+    def __init__(self, limit=RETRY_LIMIT, backoff=RETRY_BACKOFF):
+        self.limit = limit
+        self.backoff = backoff
 
-# Default settings
-DEFAULT_SETTINGS = {
-    'screen_width': 800,
-    'screen_height': 600,
-    'fps': 60,
-    'background_color': (0, 0, 0),  # Black
-}
+    def retry(self, func, *args, **kwargs):
+        attempts = 0
+        while attempts < self.limit:
+            try:
+                return func(*args, **kwargs)
+            except Exception as e:
+                attempts += 1
+                if attempts >= self.limit:
+                    raise e
+                time.sleep(self.backoff ** attempts)
 
-# Error messages
-ERROR_MESSAGES = {
-    'file_not_found': 'The specified file was not found.',
-    'invalid_game_state': 'The game is in an invalid state.',
-    'settings_format': 'Settings format is incorrect.',
-}
 
-# A simple function to fetch a configuration value with error checking
+# Example usage of the retry logic:
+if __name__ == '__main__':
+    def dummy_network_call():
+        raise ConnectionError('Unable to connect')  # Simulated failure
 
-def fetch_config_value(key):
+    network_retries = NetworkRetries()
     try:
-        if key not in DEFAULT_SETTINGS:
-            raise KeyError(ERROR_MESSAGES['settings_format'])
-        return DEFAULT_SETTINGS[key]
-    except KeyError as e:
-        print(f'Error: {str(e)}')
-        return None
-    except Exception as e:
-        print(f'Unexpected error: {str(e)}')
-        return None
+        network_retries.retry(dummy_network_call)
+    except Exception as error:
+        print(f'Final error: {error}')
