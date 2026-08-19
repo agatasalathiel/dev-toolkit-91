@@ -1,32 +1,25 @@
 import time
+import random
 
-RETRY_LIMIT = 5
-RETRY_BACKOFF = 2
+# Constants for retry logic
+MAX_RETRIES = 5
+RETRY_BACKOFF_FACTOR = 2
+RETRY_EXCEPTIONS = (ConnectionError, TimeoutError)
 
-class NetworkRetries:
-    def __init__(self, limit=RETRY_LIMIT, backoff=RETRY_BACKOFF):
-        self.limit = limit
-        self.backoff = backoff
+# Function to handle network operations with retry
 
-    def retry(self, func, *args, **kwargs):
-        attempts = 0
-        while attempts < self.limit:
-            try:
-                return func(*args, **kwargs)
-            except Exception as e:
-                attempts += 1
-                if attempts >= self.limit:
-                    raise e
-                time.sleep(self.backoff ** attempts)
-
-
-# Example usage of the retry logic:
-if __name__ == '__main__':
-    def dummy_network_call():
-        raise ConnectionError('Unable to connect')  # Simulated failure
-
-    network_retries = NetworkRetries()
-    try:
-        network_retries.retry(dummy_network_call)
-    except Exception as error:
-        print(f'Final error: {error}')
+def retry_network_operation(func, *args, **kwargs):
+    attempts = 0
+    while attempts < MAX_RETRIES:
+        try:
+            return func(*args, **kwargs)
+        except RETRY_EXCEPTIONS as e:
+            attempts += 1
+            wait_time = RETRY_BACKOFF_FACTOR ** attempts + random.uniform(0, 1)
+            time.sleep(wait_time)
+            print(f"Retrying... Attempt {attempts}/{MAX_RETRIES}")
+            if attempts == MAX_RETRIES:
+                raise e
+    
+# Example usage outside of this module:
+# response = retry_network_operation(some_network_call, arg1, arg2)
