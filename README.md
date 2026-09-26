@@ -1,17 +1,22 @@
-# Dev Toolkit 91
+# dev-toolkit-91
 
-Dev Toolkit 91 is a comprehensive Python-based toolkit designed for game developers to streamline their development process. This toolkit offers essential utilities and simplifies a variety of tasks, making game creation more efficient and enjoyable.
+`dev-toolkit-91` is a specialized Python framework designed to streamline the integration of game telemetry and asset management pipelines. It provides developers with high-performance utilities to automate build-time configurations and track player metadata in real-time.
 
 ## Features
-
-- **Sprite Management**: Easily load, manage, and animate 2D sprites with optimized performance.
-- **Audio Integration**: Simplified audio playback with support for various formats, allowing seamless background music and sound effects.
-- **Event System**: Robust event handling that enables the creation of responsive game mechanics without complex coding.
-- **Config Management**: Load and edit game configurations via JSON files, facilitating easy adjustments during development and testing.
+*   **Telemetry Streamer:** A lightweight asynchronous module for capturing and exporting in-game events to JSON or database backends.
+*   **Asset Validator:** Automates integrity checks for textures and audio files, ensuring parity between development and production environments.
+*   **State Snapshotter:** A robust serialization utility that handles complex game state saves without corrupting memory buffers.
+*   **CLI Orchestrator:** Integrated command-line interface to trigger build pipelines and cleanup tasks directly from the game root.
 
 ## Installation
 
-To get started with Dev Toolkit 91, ensure you have Python installed on your machine. Then, clone the repository and install the required dependencies with the following commands:
+Ensure you have Python 3.9+ installed. Install the toolkit via pip:
+
+```bash
+pip install dev-toolkit-91
+```
+
+For local development or extending the framework, clone the repository:
 
 ```bash
 git clone https://github.com/Developer/dev-toolkit-91.git
@@ -19,38 +24,25 @@ cd dev-toolkit-91
 pip install -r requirements.txt
 ```
 
-## Basic Usage Example
+## Usage
 
-Here's a quick example to demonstrate how to use the toolkit for loading a sprite:
+Integrating `dev-toolkit-91` into your project is straightforward. Here is a basic implementation of the Telemetry Streamer:
 
 ```python
-from dev_toolkit import Sprite, Audio, EventManager
+from dev_toolkit.telemetry import TelemetryClient
 
-# Initialize the sprite
-player_sprite = Sprite('assets/player.png')
-player_sprite.set_position(100, 150)
+# Initialize the client
+client = TelemetryClient(api_key="your_key_here", buffer_size=50)
 
-# Load background music
-background_music = Audio('assets/music/background.mp3')
-background_music.play(loop=True)
+# Log a game event
+client.log_event("player_death", {"level": 5, "coords": (120, 45, 0)})
 
-# Create an event for handling player input
-event_manager = EventManager()
-
-def on_key_press(key):
-    if key == 'space':
-        player_sprite.jump()
-
-event_manager.add_listener('key_press', on_key_press)
-
-# Start your game loop
-while True:
-    event_manager.process_events()
-    player_sprite.update()
+# Flush buffer on game exit
+client.shutdown()
 ```
 
 ## License
 
 ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
 
-Dev Toolkit 91 is licensed under the MIT License. See the LICENSE file for details. This toolkit aims to empower game developers with better tools and experiences, fostering creativity and innovation in game design.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
