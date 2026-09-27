@@ -2,41 +2,50 @@ import json
 import os
 from typing import Any, Dict
 
-class ConfigLoader:
-    def __init__(self, file_path: str, defaults: Dict[str, Any]):
-        self.path = file_path
-        self.data = defaults.copy()
-        self._load_from_disk()
+class GameConfig:
+    """Dynamic configuration loader with built-in presets for gaming profiles."""
+    PRESETS: Dict[str, Dict[str, Any]] = {
+        "potato": {"fps_cap": 30, "shadows": False, "texture_res": "low", "vsync": False},
+        "retro": {"fps_cap": 60, "shadows": False, "texture_res": "low", "vsync": True},
+        "ultra": {"fps_cap": 144, "shadows": True, "texture_res": "high", "vsync": True}
+    }
+    DEFAULT_PRESET = "retro"
 
-    def _load_from_disk(self) -> None:
-        if os.path.exists(self.path):
+    def __init__(self, config_path: str | None = None):
+        self._settings: Dict[str, Any] = {}
+        self.load(config_path)
+
+    def load(self, config_path: str | None = None) -> None:
+        preset_name = os.getenv("GAME_PRESET", self.DEFAULT_PRESET)
+        self._settings = self.PRESETS.get(preset_name, self.PRESETS[self.DEFAULT_PRESET]).copy()
+
+        if config_path and os.path.exists(config_path):
             try:
-                with open(self.path, 'r') as f:
-                    disk_data = json.load(f)
-                    self.data.update({k: v for k, v in disk_data.items() if k in self.data})
-            except (json.JSONDecodeError, IOError):
+                with open(config_path, "r") as f:
+                    file_data = json.load(f)
+                    self._settings.update(file_data)
+            except (json.JSONDecodeError, FileNotFoundError):
                 pass
 
-    def __getitem__(self, key: str) -> Any:
-        return self.data.get(key)
+        for key, val in os.environ.items():
+            if key.startswith("GAME_"):
+                setting_key = key[5:].lower()
+                if setting_key in self._settings:
+                    orig_type = type(self._settings[setting_key])
+                    try:
+                        if orig_type is bool:
+                            self._settings[setting_key] = val.lower() in ("true", "1", "yes")
+                        else:
+                            self._settings[setting_key] = orig_type(val)
+                    except ValueError:
+                        self._settings[setting_key] = val
+                else:
+                    self._settings[setting_key] = val
 
-    def __getattr__(self, item: str) -> Any:
-        return self.data.get(item)
+    def __getattr__(self, name: str) -> Any:
+        if name in self._settings:
+            return self._settings[name]
+        raise AttributeError(f"Configuration setting '{name}' not found")
 
-    def save(self) -> None:
-        with open(self.path, 'w') as f:
-            json.dump(self.data, f, indent=4)
-
-    def override(self, **kwargs) -> None:
-        self.data.update(kwargs)
-
-# Gaming engine defaults
-DEFAULT_SETTINGS = {
-    "resolution": [1920, 1080],
-    "vsync": True,
-    "fov": 90,
-    "sensitivity": 1.5
-}
-
-def get_config(path: str = "settings.json") -> ConfigLoader:
-    return ConfigLoader(path, DEFAULT_SETTINGS)
+    def __repr__(self) -> str:
+        return f"GameConfig({self._settings!r})"
