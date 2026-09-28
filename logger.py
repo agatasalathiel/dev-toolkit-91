@@ -1,44 +1,51 @@
-import sys
-from datetime import datetime
+import logging
+import os
+from logging.handlers import RotatingFileHandler
 
-class RetroGameLogger:
-    LEVELS = {
-        "QUEST": ("\033[94m[ QUEST ]\033[0m", "⚔️"),
-        "LOOT": ("\033[92m[  LOOT ]\033[0m", "💎"),
-        "WARN": ("\033[93m[ WARN  ]\033[0m", "⚠️"),
-        "DEATH": ("\033[91m[ DEATH ]\033[0m", "💀")
-    }
+RARITY_MAP = {
+    logging.DEBUG: "[COMMON]",
+    logging.INFO: "[UNCOMMON]",
+    logging.WARNING: "[RARE]",
+    logging.ERROR: "[EPIC]",
+    logging.CRITICAL: "[LEGENDARY]"
+}
 
-    def __init__(self, player_name="Hero"):
-        self.player_name = player_name
-        self.history = []
+class QuestLogFormatter(logging.Formatter):
+    """Custom log formatter dressing up standard levels as game loot rarities."""
+    def format(self, record: logging.LogRecord) -> str:
+        rarity = RARITY_MAP.get(record.levelno, "[TRASH]")
+        timestamp = self.formatTime(record, "%H:%M:%S")
+        return f"⚔️ [{timestamp}] {rarity:<11} {record.name} :: {record.getMessage()}"
 
-    def _log(self, level, message):
-        timestamp = datetime.now().strftime("%H:%M:%S")
-        prefix, icon = self.LEVELS.get(level, ("[ LOG ]", "•"))
-        formatted = f"[{timestamp}] {prefix} {icon} {self.player_name}: {message}"
-        self.history.append((timestamp, level, message))
-        sys.stdout.write(formatted + "\n")
-        sys.stdout.flush()
+def init_game_logger(name: str = "realm_event", file_path: str = "logs/quest.log", max_bytes: int = 256 * 1024, backup_count: int = 3) -> logging.Logger:
+    logger = logging.getLogger(name)
+    logger.setLevel(logging.DEBUG)
+    
+    if logger.hasHandlers():
+        return logger
 
-    def quest(self, msg):
-        self._log("QUEST", msg)
+    dir_name = os.path.dirname(file_path)
+    if dir_name:
+        os.makedirs(dir_name, exist_ok=True)
+        
+    rotating_handler = RotatingFileHandler(
+        filename=file_path,
+        maxBytes=max_bytes,
+        backupCount=backup_count,
+        encoding="utf-8"
+    )
+    
+    formatter = QuestLogFormatter()
+    rotating_handler.setFormatter(formatter)
+    logger.addHandler(rotating_handler)
+    
+    console_handler = logging.StreamHandler()
+    console_handler.setFormatter(formatter)
+    logger.addHandler(console_handler)
+    
+    return logger
 
-    def loot(self, msg):
-        self._log("LOOT", msg)
-
-    def warn(self, msg):
-        self._log("WARN", msg)
-
-    def death(self, msg):
-        self._log("DEATH", msg)
-
-    def dump_session_summary(self):
-        sys.stdout.write("\n--- 📜 ADVENTURE LOG SUMMARY 📜 ---\n")
-        counts = {}
-        for _, lvl, _ in self.history:
-            counts[lvl] = counts.get(lvl, 0) + 1
-        for lvl, count in counts.items():
-            icon = self.LEVELS[lvl][1]
-            sys.stdout.write(f"{icon} {lvl}: {count} occurrences\n")
-        sys.stdout.write("----------------------------------\n")
+if __name__ == "__main__":
+    log = init_game_logger()
+    log.info("Player entered the Dragon Spine Cavern.")
+    log.warning("Health potion count dropping below critical threshold!")
