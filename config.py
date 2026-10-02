@@ -2,34 +2,41 @@ import json
 import os
 from typing import Any, Dict
 
-class ConfigLoader:
-    def __init__(self, defaults: Dict[str, Any], path: str = 'settings.json'):
-        self.path = path
-        self.data = defaults
-        self._load_and_merge()
+class GameConfig:
+    DEFAULT_SETTINGS = {
+        "resolution": [1920, 1080],
+        "fov": 90,
+        "vsync": True,
+        "sens": 1.5
+    }
 
-    def _load_and_merge(self) -> None:
-        if os.path.exists(self.path):
+    def __init__(self, filepath: str = "settings.json"):
+        self.filepath = filepath
+        self.data = self._load_or_create()
+
+    def _load_or_create(self) -> Dict[str, Any]:
+        if not os.path.exists(self.filepath):
+            with open(self.filepath, 'w') as f:
+                json.dump(self.DEFAULT_SETTINGS, f, indent=4)
+            return self.DEFAULT_SETTINGS
+        
+        with open(self.filepath, 'r') as f:
             try:
-                with open(self.path, 'r') as f:
-                    user_data = json.load(f)
-                    self._recursive_update(self.data, user_data)
-            except (json.JSONDecodeError, IOError):
-                pass
+                user_data = json.load(f)
+                return {**self.DEFAULT_SETTINGS, **user_data}
+            except json.JSONDecodeError:
+                return self.DEFAULT_SETTINGS
 
-    def _recursive_update(self, base: Dict, patch: Dict) -> None:
-        for key, value in patch.items():
-            if isinstance(value, dict) and key in base and isinstance(base[key], dict):
-                self._recursive_update(base[key], value)
-            else:
-                base[key] = value
+    def get(self, key: str, fallback: Any = None) -> Any:
+        return self.data.get(key, fallback)
 
-    def get(self, key: str, default: Any = None) -> Any:
-        return self.data.get(key, default)
+    def __getitem__(self, key: str) -> Any:
+        return self.data[key]
 
-    def save(self) -> None:
-        with open(self.path, 'w') as f:
+    def save(self):
+        with open(self.filepath, 'w') as f:
             json.dump(self.data, f, indent=4)
 
-    def __getitem__(self, item: str) -> Any:
-        return self.data[item]
+    @classmethod
+    def initialize(cls, path: str = "settings.json"):
+        return cls(path)
