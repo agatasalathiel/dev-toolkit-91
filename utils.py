@@ -1,32 +1,35 @@
-import time
 import functools
-import random
+import time
+import logging
 
-def retry_gaming_op(max_attempts=3, base_delay=1.0):
+logger = logging.getLogger('dev-toolkit-91')
+
+class GamingToolkitError(Exception):
+    """Custom base exception for dev-toolkit-91 edge cases."""
+    pass
+
+def robust_game_state_update(retries=3, delay=0.5):
+    """Decorator for handling volatile game state synchronization errors."""
     def decorator(func):
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
-            attempts = 0
-            while attempts < max_attempts:
+            last_ex = None
+            for attempt in range(retries):
                 try:
                     return func(*args, **kwargs)
-                except Exception as e:
-                    attempts += 1
-                    if attempts >= max_attempts:
-                        raise e
-                    # Exponential backoff with jitter for game server sync
-                    delay = (base_delay * (2 ** (attempts - 1))) + (random.random() * 0.5)
-                    time.sleep(delay)
+                except (ConnectionError, TimeoutError, MemoryError) as e:
+                    last_ex = e
+                    logger.warning(f"Sync attempt {attempt + 1} failed: {e}. Retrying...")
+                    time.sleep(delay * (2 ** attempt))
+            logger.critical("Maximum retries exhausted for state sync.")
+            raise GamingToolkitError(f"Failed after {retries} attempts: {last_ex}")
         return wrapper
     return decorator
 
-@retry_gaming_op(max_attempts=4)
-def fetch_server_payload(endpoint):
-    # Simulated niche gaming network operation
-    if random.random() < 0.7:
-        raise ConnectionError("Game server heartbeat missed")
-    return {"status": "ready", "tick": 128}
-
-if __name__ == "__main__":
-    data = fetch_server_payload("lobby/region-eu")
-    print(f"Successfully synced: {data}")
+def validate_player_payload(payload):
+    """Sanity check for malformed network payloads before injection."""
+    if not isinstance(payload, dict):
+        raise ValueError("invalid payload format: dictionary expected")
+    if 'player_id' not in payload or payload.get('player_id') < 0:
+        raise GamingToolkitError("non-compliant player identification sequence")
+    return True
