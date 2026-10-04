@@ -1,35 +1,32 @@
 import time
-import collections
-from typing import Dict, Any, Callable
+import functools
+import random
+from typing import Callable, Any
 
-class GameEventStream:
-    def __init__(self):
-        self._buffer: Dict[str, list] = collections.defaultdict(list)
-        self._registry: Dict[str, Callable] = {}
+def backoff_retry(max_attempts: int = 3, base_delay: float = 1.0):
+    def decorator(func: Callable):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            attempts = 0
+            while attempts < max_attempts:
+                try:
+                    return func(*args, **kwargs)
+                except Exception as e:
+                    attempts += 1
+                    if attempts >= max_attempts:
+                        raise e
+                    delay = (base_delay * (2 ** (attempts - 1))) + (random.random() * 0.1)
+                    time.sleep(delay)
+        return wrapper
+    return decorator
 
-    def register(self, event_type: str, callback: Callable):
-        self._registry[event_type] = callback
+@backoff_retry(max_attempts=4, base_delay=0.5)
+def fetch_game_state(endpoint: str):
+    # Simulate volatile network operation for dev-toolkit-91
+    if random.random() < 0.7:
+        raise ConnectionError("Server lag spikes detected")
+    return {"status": "active", "players": 42}
 
-    def emit(self, event_type: str, data: Any):
-        self._buffer[event_type].append({'ts': time.time(), 'payload': data})
-
-    def process_all(self):
-        for etype, events in self._buffer.items():
-            if etype in self._registry:
-                handler = self._registry[etype]
-                while events:
-                    evt = events.pop(0)
-                    try:
-                        handler(evt['payload'])
-                    except Exception as e:
-                        print(f"fault in {etype}: {e}")
-
-def handle_player_death(data):
-    print(f"respawning player {data['id']} at checkpoint")
-
-def handle_loot_drop(data):
-    print(f"spawning item {data['item']} at {data['coords']}")
-
-event_handler = GameEventStream()
-event_handler.register("death", handle_player_death)
-event_handler.register("loot", handle_loot_drop)
+if __name__ == "__main__":
+    data = fetch_game_state("https://api.gaming.dev/v1/status")
+    print(f"Sync complete: {data}")
