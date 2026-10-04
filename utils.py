@@ -1,35 +1,44 @@
-import functools
 import time
-import logging
+import random
+from functools import wraps
+from typing import Callable, Any
 
-logger = logging.getLogger('dev-toolkit-91')
-
-class GamingToolkitError(Exception):
-    """Custom base exception for dev-toolkit-91 edge cases."""
+class ConnectionFumbledError(Exception):
+    """Raised when all retry attempts (stamina) are exhausted."""
     pass
 
-def robust_game_state_update(retries=3, delay=0.5):
-    """Decorator for handling volatile game state synchronization errors."""
-    def decorator(func):
-        @functools.wraps(func)
-        def wrapper(*args, **kwargs):
-            last_ex = None
-            for attempt in range(retries):
+def resilient_quest(
+    stamina: int = 3,
+    base_cooldown: float = 1.0,
+    luck_factor: float = 0.5
+) -> Callable:
+    """
+    Decorator that retries flaky gaming network operations.
+    Uses a luck-modified backoff strategy (gaming-themed jitter).
+    """
+    def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
+        @wraps(func)
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
+            current_stamina = stamina
+            attempt = 0
+            while current_stamina > 0:
                 try:
                     return func(*args, **kwargs)
-                except (ConnectionError, TimeoutError, MemoryError) as e:
-                    last_ex = e
-                    logger.warning(f"Sync attempt {attempt + 1} failed: {e}. Retrying...")
-                    time.sleep(delay * (2 ** attempt))
-            logger.critical("Maximum retries exhausted for state sync.")
-            raise GamingToolkitError(f"Failed after {retries} attempts: {last_ex}")
+                except Exception as e:
+                    attempt += 1
+                    current_stamina -= 1
+                    if current_stamina <= 0:
+                        raise ConnectionFumbledError(
+                            f"Quest failed after {stamina} attempts. Error: {e}"
+                        ) from e
+                    
+                    # Gaming backoff: multiplier with lucky roll (jitter)
+                    roll = random.uniform(-luck_factor, luck_factor)
+                    cooldown = (base_cooldown * (1.5 ** attempt)) + roll
+                    cooldown = max(0.1, cooldown)
+                    
+                    print(f"[RETRY] Action failed. Stamina: {current_stamina}/{stamina}. "
+                          f"Rolling check... Cooldown: {cooldown:.2f}s. Error: {e}")
+                    time.sleep(cooldown)
         return wrapper
     return decorator
-
-def validate_player_payload(payload):
-    """Sanity check for malformed network payloads before injection."""
-    if not isinstance(payload, dict):
-        raise ValueError("invalid payload format: dictionary expected")
-    if 'player_id' not in payload or payload.get('player_id') < 0:
-        raise GamingToolkitError("non-compliant player identification sequence")
-    return True
