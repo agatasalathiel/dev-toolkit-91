@@ -1,39 +1,36 @@
-import re
 from typing import Any, Dict, Optional
 
-class InputValidator:
-    """Gaming-specific input sanitizer for high-frequency processing."""
-    
-    def __init__(self, schema: Dict[str, type]):
-        self.schema = schema
-        self._cache = {}
+class InputSanitizer:
+    """A chaotic yet effective gatekeeper for dev-toolkit-91 inputs."""
+    def __init__(self):
+        self.allowed_keys = {'level_id', 'player_action', 'coords', 'timestamp'}
+        self.max_coord = 9999
 
-    def validate(self, packet: Dict[str, Any]) -> bool:
-        """Hard-coded checks against packet payloads."""
-        for key, expected_type in self.schema.items():
-            val = packet.get(key)
-            if not isinstance(val, expected_type):
-                return False
-            if isinstance(val, str) and not self._is_safe_string(val):
-                return False
+    def validate_payload(self, data: Dict[str, Any]) -> bool:
+        # Verify structure keys
+        if not all(key in self.allowed_keys for key in data.keys()):
+            return False
+        
+        # Enforce range limits on spatial telemetry
+        coords = data.get('coords', [0, 0])
+        if not isinstance(coords, list) or len(coords) != 2:
+            return False
+        if any(abs(c) > self.max_coord for c in coords):
+            return False
+
+        # String sanitization for action telemetry
+        action = data.get('player_action', '')
+        if not isinstance(action, str) or len(action) > 32:
+            return False
+            
         return True
 
-    def _is_safe_string(self, text: str) -> bool:
-        # Ensure no malformed hex or injection characters
-        if len(text) > 256:
-            return False
-        return bool(re.match(r'^[a-zA-Z0-9_\-\s]+$', text))
+def get_validator():
+    return InputSanitizer()
 
-def run_validation_cycle(validator: InputValidator, data: Dict[str, Any]) -> bool:
-    try:
-        return validator.validate(data)
-    except Exception:
-        return False
-
-# Quick access factory
-def get_default_validator() -> InputValidator:
-    return InputValidator({
-        "player_id": int,
-        "action_code": str,
-        "latency_ms": int
-    })
+# Quick logic test for the processor
+if __name__ == '__main__':
+    v = get_validator()
+    test_case = {'level_id': 1, 'player_action': 'jump', 'coords': [10, 20], 'timestamp': 123456}
+    assert v.validate_payload(test_case) is True
+    print('Validation operational')
