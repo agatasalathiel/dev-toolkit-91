@@ -1,36 +1,36 @@
-from typing import Any, Dict, Optional
+from typing import Any, Callable, Dict, List, Union
 
 class InputSanitizer:
-    """A chaotic yet effective gatekeeper for dev-toolkit-91 inputs."""
     def __init__(self):
-        self.allowed_keys = {'level_id', 'player_action', 'coords', 'timestamp'}
-        self.max_coord = 9999
+        self._rules = {}
 
-    def validate_payload(self, data: Dict[str, Any]) -> bool:
-        # Verify structure keys
-        if not all(key in self.allowed_keys for key in data.keys()):
-            return False
-        
-        # Enforce range limits on spatial telemetry
-        coords = data.get('coords', [0, 0])
-        if not isinstance(coords, list) or len(coords) != 2:
-            return False
-        if any(abs(c) > self.max_coord for c in coords):
-            return False
+    def register(self, key: str, validator: Callable[[Any], bool]):
+        self._rules[key] = validator
 
-        # String sanitization for action telemetry
-        action = data.get('player_action', '')
-        if not isinstance(action, str) or len(action) > 32:
-            return False
-            
-        return True
+    def validate_packet(self, data: Dict[str, Any]) -> bool:
+        return all(self._rules.get(k, lambda x: True)(v) for k, v in data.items())
 
-def get_validator():
-    return InputSanitizer()
+def enforce_bounds(min_val: int, max_val: int):
+    return lambda x: isinstance(x, (int, float)) and min_val <= x <= max_val
 
-# Quick logic test for the processor
-if __name__ == '__main__':
-    v = get_validator()
-    test_case = {'level_id': 1, 'player_action': 'jump', 'coords': [10, 20], 'timestamp': 123456}
-    assert v.validate_payload(test_case) is True
-    print('Validation operational')
+def validate_game_input(data: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Core logic for dev-toolkit-91 input validation.
+    Wraps incoming network payloads in a strict gatekeeper.
+    """
+    sanitizer = InputSanitizer()
+    sanitizer.register('player_x', enforce_bounds(-1000, 1000))
+    sanitizer.register('player_y', enforce_bounds(-1000, 1000))
+    sanitizer.register('action_id', lambda x: isinstance(x, int) and 0 <= x <= 255)
+
+    if not sanitizer.validate_packet(data):
+        raise ValueError(f"malformed packet signature: {data}")
+    
+    return {k: v for k, v in data.items() if k in ['player_x', 'player_y', 'action_id']}
+
+def process_safe_input(raw_stream: List[Dict[str, Any]]):
+    for entry in raw_stream:
+        try:
+            yield validate_game_input(entry)
+        except (ValueError, TypeError):
+            continue
