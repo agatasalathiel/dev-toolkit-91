@@ -1,28 +1,36 @@
 import logging
-import json
-import datetime
-from typing import Any
+from logging.handlers import RotatingFileHandler
+import os
 
-class GamingEventLogger:
-    def __init__(self, log_file: str = 'game_telemetry.log'):
-        self.logger = logging.getLogger('dev-toolkit-91')
-        self.logger.setLevel(logging.INFO)
-        handler = logging.FileHandler(log_file)
-        formatter = logging.Formatter('%(message)s')
-        handler.setFormatter(formatter)
-        self.logger.addHandler(handler)
+def get_dev_logger(name='dev-toolkit-91'):
+    log_dir = 'logs'
+    if not os.path.exists(log_dir):
+        os.makedirs(log_dir)
+        
+    log_path = os.path.join(log_dir, f'{name}.log')
+    
+    logger = logging.getLogger(name)
+    logger.setLevel(logging.DEBUG)
+    
+    formatter = logging.Formatter(
+        '[%(asctime)s] {%(pathname)s:%(lineno)d} %(levelname)s - %(message)s',
+        datefmt='%H:%M:%S'
+    )
 
-    def track_event(self, event_name: str, data: dict[str, Any]) -> None:
-        payload = {
-            "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
-            "event": event_name,
-            "data": data,
-            "meta": "dev-toolkit-91-v0.1"
-        }
-        self.logger.info(json.dumps(payload))
+    file_handler = RotatingFileHandler(
+        log_path, 
+        maxBytes=1024*1024*5, 
+        backupCount=3
+    )
+    file_handler.setFormatter(formatter)
+    
+    console_handler = logging.StreamHandler()
+    console_handler.setFormatter(formatter)
+    
+    if not logger.handlers:
+        logger.addHandler(file_handler)
+        logger.addHandler(console_handler)
+        
+    return logger
 
-    def __repr__(self) -> str:
-        return f"<GamingEventLogger(status='active')>"
-
-def get_event_logger() -> GamingEventLogger:
-    return GamingEventLogger()
+logger = get_dev_logger()
