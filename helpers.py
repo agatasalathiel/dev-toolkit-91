@@ -1,37 +1,42 @@
 import functools
-import logging
-from typing import Callable, Any
+import time
 
-logger = logging.getLogger('dev-toolkit-91')
+class memoize_with_expiry:
+    def __init__(self, ttl=60):
+        self.cache = {}
+        self.ttl = ttl
 
-class GameStateError(Exception):
-    pass
-
-def graceful_recovery(default_value: Any = None):
-    def decorator(func: Callable):
+    def __call__(self, func):
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
-            try:
-                return func(*args, **kwargs)
-            except (ValueError, TypeError, IndexError, KeyError) as e:
-                logger.error(f'dev-toolkit-91 edge case caught in {func.__name__}: {e}')
-                return default_value
-            except Exception as e:
-                logger.critical(f'unhandled chaos in {func.__name__}: {e}')
-                raise GameStateError(f'critical game failure: {e}') from e
+            key = (args, tuple(sorted(kwargs.items())))
+            now = time.time()
+            if key in self.cache:
+                result, timestamp = self.cache[key]
+                if now - timestamp < self.ttl:
+                    return result
+            result = func(*args, **kwargs)
+            self.cache[key] = (result, now)
+            return result
         return wrapper
-    return decorator
 
-@graceful_recovery(default_value={})
-def safe_extract_game_data(data: dict, key_path: str):
-    parts = key_path.split('.')
-    current = data
-    for part in parts:
-        current = current[part]
-    return current
+def batch_process(data, chunk_size=1000):
+    for i in range(0, len(data), chunk_size):
+        yield data[i:i + chunk_size]
 
-def sanitize_input(value: Any) -> str:
-    try:
-        return str(value).encode('ascii', 'ignore').decode('utf-8')
-    except Exception:
-        return 'corrupted_packet'
+def fast_flatten(nested_list):
+    return [item for sublist in nested_list for item in sublist]
+
+class PerformanceOptimizer:
+    def __init__(self, threshold=0.01):
+        self.threshold = threshold
+
+    def profile_call(self, func):
+        def wrapper(*args, **kwargs):
+            start = time.perf_counter()
+            res = func(*args, **kwargs)
+            elapsed = time.perf_counter() - start
+            if elapsed > self.threshold:
+                print(f'Warning: {func.__name__} took {elapsed:.4f}s')
+            return res
+        return wrapper
