@@ -1,36 +1,31 @@
-from typing import Any, Callable, Dict, List, Union
+import re
 
-class InputSanitizer:
-    def __init__(self):
-        self._rules = {}
-
-    def register(self, key: str, validator: Callable[[Any], bool]):
-        self._rules[key] = validator
-
-    def validate_packet(self, data: Dict[str, Any]) -> bool:
-        return all(self._rules.get(k, lambda x: True)(v) for k, v in data.items())
-
-def enforce_bounds(min_val: int, max_val: int):
-    return lambda x: isinstance(x, (int, float)) and min_val <= x <= max_val
-
-def validate_game_input(data: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Core logic for dev-toolkit-91 input validation.
-    Wraps incoming network payloads in a strict gatekeeper.
-    """
-    sanitizer = InputSanitizer()
-    sanitizer.register('player_x', enforce_bounds(-1000, 1000))
-    sanitizer.register('player_y', enforce_bounds(-1000, 1000))
-    sanitizer.register('action_id', lambda x: isinstance(x, int) and 0 <= x <= 255)
-
-    if not sanitizer.validate_packet(data):
-        raise ValueError(f"malformed packet signature: {data}")
+class GameValidator:
+    """Creative validation logic for dev-toolkit-91 gaming assets"""
     
-    return {k: v for k, v in data.items() if k in ['player_x', 'player_y', 'action_id']}
+    @staticmethod
+    def is_valid_entity_name(name: str) -> bool:
+        # Allow alphanumeric, underscores, and hyphens; 3-16 chars
+        return bool(re.match(r'^[a-zA-Z0-9_-]{3,16}$', name))
 
-def process_safe_input(raw_stream: List[Dict[str, Any]]):
-    for entry in raw_stream:
-        try:
-            yield validate_game_input(entry)
-        except (ValueError, TypeError):
-            continue
+    @staticmethod
+    def clamp_stat(value: float, min_val: float = 0.0, max_val: float = 100.0) -> float:
+        # Force values into the standard gaming bracket
+        return max(min_val, min(value, max_val))
+
+    @staticmethod
+    def validate_hex_color(hex_str: str) -> bool:
+        # Check for standard 6-digit hex format used in game UIs
+        pattern = re.compile(r'^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$')
+        return bool(pattern.match(hex_str))
+
+    @staticmethod
+    def sanitize_coordinates(coords: tuple) -> tuple:
+        # Ensure coordinates are within a standard map grid
+        return tuple(round(float(c), 2) for c in coords)
+
+    @classmethod
+    def check_version(cls, version: str) -> bool:
+        # Versioning schema: major.minor.patch
+        parts = version.split('.')
+        return len(parts) == 3 and all(p.isdigit() for p in parts)
