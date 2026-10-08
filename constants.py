@@ -1,25 +1,31 @@
-import time
-import random
+import enum
+from typing import Final, Dict, Any
 
-# Constants for retry logic
-MAX_RETRIES = 5
-RETRY_BACKOFF_FACTOR = 2
-RETRY_EXCEPTIONS = (ConnectionError, TimeoutError)
+class GameErrorCodes(enum.IntEnum):
+    SUCCESS = 0
+    PLAYER_DISCONNECTED = 1001
+    ASSET_CORRUPTION = 1002
+    BUFFER_OVERFLOW = 1003
+    INVALID_STATE_TRANSITION = 1004
+    ENGINE_CRITICAL_FAILURE = 9999
 
-# Function to handle network operations with retry
+ERROR_MESSAGES: Final[Dict[int, str]] = {
+    GameErrorCodes.SUCCESS: "Everything is fine, carry on.",
+    GameErrorCodes.PLAYER_DISCONNECTED: "Player vanished into the void.",
+    GameErrorCodes.ASSET_CORRUPTION: "Texture metadata is screaming for help.",
+    GameErrorCodes.BUFFER_OVERFLOW: "Too much data for this tiny pipe.",
+    GameErrorCodes.INVALID_STATE_TRANSITION: "Game state teleported somewhere illegal.",
+    GameErrorCodes.ENGINE_CRITICAL_FAILURE: "The virtual world is burning."
+}
 
-def retry_network_operation(func, *args, **kwargs):
-    attempts = 0
-    while attempts < MAX_RETRIES:
-        try:
-            return func(*args, **kwargs)
-        except RETRY_EXCEPTIONS as e:
-            attempts += 1
-            wait_time = RETRY_BACKOFF_FACTOR ** attempts + random.uniform(0, 1)
-            time.sleep(wait_time)
-            print(f"Retrying... Attempt {attempts}/{MAX_RETRIES}")
-            if attempts == MAX_RETRIES:
-                raise e
-    
-# Example usage outside of this module:
-# response = retry_network_operation(some_network_call, arg1, arg2)
+RETRY_POLICY: Final[Dict[str, Any]] = {
+    "max_retries": 3,
+    "backoff_factor": 0.5,
+    "recoverable_codes": [
+        GameErrorCodes.PLAYER_DISCONNECTED,
+        GameErrorCodes.BUFFER_OVERFLOW
+    ]
+}
+
+def get_error_desc(code: int) -> str:
+    return ERROR_MESSAGES.get(code, "Unknown anomaly detected in dev-toolkit-91.")
