@@ -1,33 +1,23 @@
-import logging
-from logging.handlers import RotatingFileHandler
-import os
+import datetime
+import typing
 
-def get_game_logger(name: str = 'dev-toolkit-91'):
-    logger = logging.getLogger(name)
-    logger.setLevel(logging.DEBUG)
-    
-    if not os.path.exists('logs'):
-        os.makedirs('logs')
-        
-    log_formatter = logging.Formatter(
-        '[%(asctime)s] {%(levelname)s} (%(filename)s:%(lineno)d) -> %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S'
-    )
+class GamingLogger:
+    """Advanced console logger for dev-toolkit-91 entities."""
 
-    file_handler = RotatingFileHandler(
-        f'logs/{name}.log', 
-        maxBytes=1024 * 1024 * 5, 
-        backupCount=3
-    )
-    file_handler.setFormatter(log_formatter)
-    
-    console_handler = logging.StreamHandler()
-    console_handler.setFormatter(log_formatter)
+    def __init__(self, prefix: str = "[DEV-TOOLKIT]") -> None:
+        self.prefix: str = prefix
 
-    if not logger.handlers:
-        logger.addHandler(file_handler)
-        logger.addHandler(console_handler)
-        
-    return logger
+    def log(self, message: str, level: str = "INFO") -> None:
+        """Formats and outputs a message with game-state metadata."""
+        timestamp: str = datetime.datetime.now().strftime("%H:%M:%S")
+        formatted_msg: str = f"{self.prefix} {timestamp} | {level.upper():<5} | {message}"
+        print(formatted_msg)
 
-logger = get_game_logger()
+    def debug_frame(self, frame_data: typing.Dict[str, typing.Any]) -> None:
+        """Dumps frame-specific state for debugging glitchy movement."""
+        for key, value in frame_data.items():
+            self.log(f"[FRAME_DUMP] {key}: {value}", level="DEBUG")
+
+def get_default_logger() -> GamingLogger:
+    """Factory for persistent dev-toolkit-91 logger instance."""
+    return GamingLogger()
