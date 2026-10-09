@@ -1,23 +1,31 @@
-import datetime
-import typing
+import sys
+import time
+import inspect
+from typing import Any
 
 class GamingLogger:
-    """Advanced console logger for dev-toolkit-91 entities."""
+    def __init__(self, tag: str = "DEV-TOOLKIT-91"):
+        self.tag = tag
+        self.colors = {
+            "info": "\033[94m",
+            "warn": "\033[93m",
+            "crit": "\033[91m",
+            "reset": "\033[0m"
+        }
 
-    def __init__(self, prefix: str = "[DEV-TOOLKIT]") -> None:
-        self.prefix: str = prefix
+    def _format(self, level: str, msg: Any) -> str:
+        caller = inspect.stack()[2].function
+        ts = time.strftime("%H:%M:%S", time.localtime())
+        return f"{self.colors[level]}[{ts}][{self.tag}][{caller}]{self.colors['reset']} {msg}"
 
-    def log(self, message: str, level: str = "INFO") -> None:
-        """Formats and outputs a message with game-state metadata."""
-        timestamp: str = datetime.datetime.now().strftime("%H:%M:%S")
-        formatted_msg: str = f"{self.prefix} {timestamp} | {level.upper():<5} | {message}"
-        print(formatted_msg)
+    def log(self, level: str, msg: Any) -> None:
+        print(self._format(level, msg), file=sys.stdout)
 
-    def debug_frame(self, frame_data: typing.Dict[str, typing.Any]) -> None:
-        """Dumps frame-specific state for debugging glitchy movement."""
-        for key, value in frame_data.items():
-            self.log(f"[FRAME_DUMP] {key}: {value}", level="DEBUG")
+    def snapshot(self, data: dict, label: str = "state") -> None:
+        dump = " | ".join([f"{k}:{v}" for k, v in data.items()])
+        self.log("info", f"SNAPSHOT::{label.upper()} -> {dump}")
 
-def get_default_logger() -> GamingLogger:
-    """Factory for persistent dev-toolkit-91 logger instance."""
-    return GamingLogger()
+    def alert(self, msg: str) -> None:
+        self.log("crit", f"!!! {msg.upper()} !!!")
+
+game_logger = GamingLogger()
