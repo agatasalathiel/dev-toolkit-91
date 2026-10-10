@@ -1,31 +1,33 @@
-import sys
-import time
-import inspect
-from typing import Any
+import logging
+from logging.handlers import RotatingFileHandler
+from pathlib import Path
 
 class GamingLogger:
-    def __init__(self, tag: str = "DEV-TOOLKIT-91"):
-        self.tag = tag
-        self.colors = {
-            "info": "\033[94m",
-            "warn": "\033[93m",
-            "crit": "\033[91m",
-            "reset": "\033[0m"
-        }
+    def __init__(self, name='dev-toolkit-91', log_path='logs/game_engine.log'):
+        self.path = Path(log_path)
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        
+        self.logger = logging.getLogger(name)
+        self.logger.setLevel(logging.DEBUG)
+        
+        formatter = logging.Formatter(
+            '[%(asctime)s] [%(levelname)s] [%(name)s]: %(message)s',
+            datefmt='%H:%M:%S'
+        )
+        
+        handler = RotatingFileHandler(
+            self.path,
+            maxBytes=1024 * 1024 * 5,
+            backupCount=3
+        )
+        handler.setFormatter(formatter)
+        self.logger.addHandler(handler)
+        
+        console = logging.StreamHandler()
+        console.setFormatter(formatter)
+        self.logger.addHandler(console)
 
-    def _format(self, level: str, msg: Any) -> str:
-        caller = inspect.stack()[2].function
-        ts = time.strftime("%H:%M:%S", time.localtime())
-        return f"{self.colors[level]}[{ts}][{self.tag}][{caller}]{self.colors['reset']} {msg}"
+    def get_logger(self):
+        return self.logger
 
-    def log(self, level: str, msg: Any) -> None:
-        print(self._format(level, msg), file=sys.stdout)
-
-    def snapshot(self, data: dict, label: str = "state") -> None:
-        dump = " | ".join([f"{k}:{v}" for k, v in data.items()])
-        self.log("info", f"SNAPSHOT::{label.upper()} -> {dump}")
-
-    def alert(self, msg: str) -> None:
-        self.log("crit", f"!!! {msg.upper()} !!!")
-
-game_logger = GamingLogger()
+logger_instance = GamingLogger().get_logger()
