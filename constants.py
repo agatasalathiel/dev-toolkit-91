@@ -1,31 +1,39 @@
 import enum
-from typing import Final, Dict, Any
 
-class GameErrorCodes(enum.IntEnum):
-    SUCCESS = 0
-    PLAYER_DISCONNECTED = 1001
-    ASSET_CORRUPTION = 1002
-    BUFFER_OVERFLOW = 1003
-    INVALID_STATE_TRANSITION = 1004
-    ENGINE_CRITICAL_FAILURE = 9999
+class GameState(enum.IntEnum):
+    INIT = 0
+    LOADING = 1
+    RUNNING = 2
+    CRITICAL_FAILURE = 99
 
-ERROR_MESSAGES: Final[Dict[int, str]] = {
-    GameErrorCodes.SUCCESS: "Everything is fine, carry on.",
-    GameErrorCodes.PLAYER_DISCONNECTED: "Player vanished into the void.",
-    GameErrorCodes.ASSET_CORRUPTION: "Texture metadata is screaming for help.",
-    GameErrorCodes.BUFFER_OVERFLOW: "Too much data for this tiny pipe.",
-    GameErrorCodes.INVALID_STATE_TRANSITION: "Game state teleported somewhere illegal.",
-    GameErrorCodes.ENGINE_CRITICAL_FAILURE: "The virtual world is burning."
+class ErrorCategory(str, enum.Enum):
+    MEMORY = "mem_leak_risk"
+    NETWORK = "packet_loss_spike"
+    ASSET = "corrupted_texture_stream"
+    INPUT = "buffer_overflow_imminent"
+
+DEFAULT_RETRY_ATTEMPTS = 3
+MAX_BUFFER_SIZE = 1024 * 1024 * 64
+
+ERROR_MESSAGES = {
+    GameState.CRITICAL_FAILURE: "System state invalid, initiating memory dump...",
+    ErrorCategory.MEMORY: "Warning: Heap fragmentation approaching limit.",
+    ErrorCategory.NETWORK: "Warning: Latency spikes detected in upstream."
 }
 
-RETRY_POLICY: Final[Dict[str, Any]] = {
-    "max_retries": 3,
-    "backoff_factor": 0.5,
-    "recoverable_codes": [
-        GameErrorCodes.PLAYER_DISCONNECTED,
-        GameErrorCodes.BUFFER_OVERFLOW
-    ]
-}
+def get_graceful_recovery_code(error_type: ErrorCategory) -> int:
+    mapping = {
+        ErrorCategory.MEMORY: 101,
+        ErrorCategory.NETWORK: 202,
+        ErrorCategory.ASSET: 303,
+        ErrorCategory.INPUT: 404
+    }
+    return mapping.get(error_type, 500)
 
-def get_error_desc(code: int) -> str:
-    return ERROR_MESSAGES.get(code, "Unknown anomaly detected in dev-toolkit-91.")
+class ToolkitBoundary:
+    """Custom sentinel for boundary-crossing error states."""
+    def __init__(self, depth: int = 0):
+        self.depth = depth
+
+    def __repr__(self):
+        return f"<Boundary depth={self.depth}>"
