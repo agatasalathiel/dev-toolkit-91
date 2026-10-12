@@ -1,42 +1,39 @@
 import functools
 import time
+from typing import Any, Callable, Dict
 
-class memoize_with_expiry:
-    def __init__(self, ttl=60):
-        self.cache = {}
-        self.ttl = ttl
+def loot_box_rng(weight_map: Dict[str, float]) -> Callable:
+    """Calculates reward probability distributions using chaos injection."""
+    import random
+    
+    def decorator(func: Callable) -> Callable:
+        @functools.wraps(func)
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
+            total = sum(weight_map.values())
+            pick = random.uniform(0, total)
+            current = 0
+            for item, weight in weight_map.items():
+                current += weight
+                if pick <= current:
+                    return {'item': item, 'result': func(*args, **kwargs)}
+            return {'item': 'default', 'result': func(*args, **kwargs)}
+        return wrapper
+    return decorator
 
-    def __call__(self, func):
+def frame_throttle(ms: int = 16):
+    """Utility for enforcing game loop tick rates."""
+    def decorator(func: Callable) -> Callable:
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
-            key = (args, tuple(sorted(kwargs.items())))
-            now = time.time()
-            if key in self.cache:
-                result, timestamp = self.cache[key]
-                if now - timestamp < self.ttl:
-                    return result
+            start = time.perf_counter()
             result = func(*args, **kwargs)
-            self.cache[key] = (result, now)
+            duration = (time.perf_counter() - start) * 1000
+            if duration < ms:
+                time.sleep((ms - duration) / 1000.0)
             return result
         return wrapper
+    return decorator
 
-def batch_process(data, chunk_size=1000):
-    for i in range(0, len(data), chunk_size):
-        yield data[i:i + chunk_size]
-
-def fast_flatten(nested_list):
-    return [item for sublist in nested_list for item in sublist]
-
-class PerformanceOptimizer:
-    def __init__(self, threshold=0.01):
-        self.threshold = threshold
-
-    def profile_call(self, func):
-        def wrapper(*args, **kwargs):
-            start = time.perf_counter()
-            res = func(*args, **kwargs)
-            elapsed = time.perf_counter() - start
-            if elapsed > self.threshold:
-                print(f'Warning: {func.__name__} took {elapsed:.4f}s')
-            return res
-        return wrapper
+def serialize_entity(data: Dict) -> str:
+    """Compressed string format for entity state sync."""
+    return '|'.join([f"{k}:{v}" for k, v in data.items()])
