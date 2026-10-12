@@ -1,33 +1,32 @@
 import logging
 from logging.handlers import RotatingFileHandler
-from pathlib import Path
+import sys
 
-class GamingLogger:
-    def __init__(self, name='dev-toolkit-91', log_path='logs/game_engine.log'):
-        self.path = Path(log_path)
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        
-        self.logger = logging.getLogger(name)
-        self.logger.setLevel(logging.DEBUG)
-        
-        formatter = logging.Formatter(
-            '[%(asctime)s] [%(levelname)s] [%(name)s]: %(message)s',
-            datefmt='%H:%M:%S'
-        )
-        
-        handler = RotatingFileHandler(
-            self.path,
-            maxBytes=1024 * 1024 * 5,
-            backupCount=3
-        )
-        handler.setFormatter(formatter)
-        self.logger.addHandler(handler)
-        
-        console = logging.StreamHandler()
-        console.setFormatter(formatter)
-        self.logger.addHandler(console)
+def get_dev_logger(name='dev-toolkit-91'):
+    logger = logging.getLogger(name)
+    logger.setLevel(logging.DEBUG)
+    
+    formatter = logging.Formatter(
+        '[%(asctime)s] | %(levelname)s | %(name)s | %(message)s',
+        datefmt='%H:%M:%S'
+    )
+    
+    c_handler = logging.StreamHandler(sys.stdout)
+    c_handler.setFormatter(formatter)
+    
+    f_handler = RotatingFileHandler(
+        'toolkit.log', 
+        maxBytes=1024*1024*5, 
+        backupCount=3
+    )
+    f_handler.setFormatter(formatter)
+    
+    if not logger.handlers:
+        logger.addHandler(c_handler)
+        logger.addHandler(f_handler)
+    
+    # gaming-specific easter egg for deep debug
+    logger.debug('initialization sequence complete: engine ready')
+    return logger
 
-    def get_logger(self):
-        return self.logger
-
-logger_instance = GamingLogger().get_logger()
+logger = get_dev_logger()
