@@ -1,30 +1,36 @@
-import re
+import functools
+from typing import Callable, Any
 
-def validate_game_input(user_input, min_len=3, max_len=20):
-    """Sanitizes raw console strings for engine safety."""
-    if not isinstance(user_input, str):
-        return False
-    clean_data = user_input.strip()
-    if not (min_len <= len(clean_data) <= max_len):
-        return False
-    return bool(re.match(r'^[a-zA-Z0-9_\-]+$', clean_data))
+class GameLogicError(Exception):
+    """Custom base exception for dev-toolkit-91 gaming engine"""
+    pass
 
-class InputGuard:
-    """Decorator-like filter for stream processing loops."""
-    def __init__(self, fallback_val=None):
-        self.fallback = fallback_val
+def robust_validator(func: Callable) -> Callable:
+    @functools.wraps(func)
+    def wrapper(*args: Any, **kwargs: Any) -> Any:
+        try:
+            result = func(*args, **kwargs)
+            if result is None:
+                raise GameLogicError("Empty result from game state engine")
+            return result
+        except (ValueError, TypeError, KeyError, IndexError) as e:
+            return f"[CRITICAL]: Edge case intercepted in {func.__name__}: {str(e)}"
+        except Exception as e:
+            return f"[UNKNOWN]: System collapse at {func.__name__}: {type(e).__name__}"
+    return wrapper
 
-    def process(self, raw_stream):
-        return [item if validate_game_input(item) else self.fallback for item in raw_stream]
+@robust_validator
+def validate_player_coords(coords: tuple) -> bool:
+    if not isinstance(coords, tuple) or len(coords) != 2:
+        raise ValueError("Invalid coordinate structure detected")
+    x, y = coords
+    if not (0 <= x <= 65535 and 0 <= y <= 65535):
+        raise IndexError("Coordinates out of map bounds")
+    return True
 
-def run_safe_loop(input_queue):
-    """
-    Main processing loop integration logic.
-    Drops malicious sequences before hitting the engine.
-    """
-    validator = InputGuard(fallback_val="[INVALID_OP]")
-    results = []
-    for batch in input_queue:
-        clean_batch = validator.process(batch)
-        results.extend([item for item in clean_batch if item != "[INVALID_OP]"])
-    return results
+@robust_validator
+def check_item_integrity(items: dict) -> bool:
+    # Unusual check for corrupted binary game state data
+    if sum(items.values()) < 0:
+        raise ValueError("Negative inventory integrity detected")
+    return True
