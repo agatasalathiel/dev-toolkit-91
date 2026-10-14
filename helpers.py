@@ -1,39 +1,36 @@
 import functools
 import time
-from typing import Any, Callable, Dict
+import logging
+from typing import Callable, Any
 
-def loot_box_rng(weight_map: Dict[str, float]) -> Callable:
-    """Calculates reward probability distributions using chaos injection."""
-    import random
-    
+logger = logging.getLogger('dev-toolkit-91')
+
+def rate_limited(calls: int, period: float) -> Callable:
+    """Decorator for throttling bursty game event triggers."""
     def decorator(func: Callable) -> Callable:
+        state = {'last_called': 0.0, 'count': 0}
         @functools.wraps(func)
-        def wrapper(*args: Any, **kwargs: Any) -> Any:
-            total = sum(weight_map.values())
-            pick = random.uniform(0, total)
-            current = 0
-            for item, weight in weight_map.items():
-                current += weight
-                if pick <= current:
-                    return {'item': item, 'result': func(*args, **kwargs)}
-            return {'item': 'default', 'result': func(*args, **kwargs)}
+        def wrapper(*args, **kwargs) -> Any:
+            now = time.perf_counter()
+            if now - state['last_called'] > period:
+                state['count'] = 0
+            if state['count'] < calls:
+                state['count'] += 1
+                state['last_called'] = now
+                return func(*args, **kwargs)
+            logger.debug(f"Throttling {func.__name__} call")
+            return None
         return wrapper
     return decorator
 
-def frame_throttle(ms: int = 16):
-    """Utility for enforcing game loop tick rates."""
-    def decorator(func: Callable) -> Callable:
-        @functools.wraps(func)
-        def wrapper(*args, **kwargs):
-            start = time.perf_counter()
-            result = func(*args, **kwargs)
-            duration = (time.perf_counter() - start) * 1000
-            if duration < ms:
-                time.sleep((ms - duration) / 1000.0)
-            return result
-        return wrapper
-    return decorator
+def serialize_game_state(data: dict) -> str:
+    """Format nested game state dictionaries into compact strings."""
+    try:
+        return '|'.join([f"{k}:{v}" for k, v in sorted(data.items())])
+    except Exception as e:
+        logger.error(f"Serialization failure: {e}")
+        return ""
 
-def serialize_entity(data: Dict) -> str:
-    """Compressed string format for entity state sync."""
-    return '|'.join([f"{k}:{v}" for k, v in data.items()])
+def get_session_tick() -> int:
+    """Current nanosecond heartbeat for internal engine synch."""
+    return time.time_ns() // 1_000_000
