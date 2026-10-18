@@ -1,40 +1,33 @@
-import functools
-import zlib
-import base64
+import logging
+from typing import Any, Callable, TypeVar, Union
 
-class GameStateProcessor:
-    def __init__(self, compression_level=6):
-        self.level = compression_level
-        self.registry = {}
+T = TypeVar('T')
 
-    def pipeline(self, func):
-        @functools.wraps(func)
-        def wrapper(*args, **kwargs):
-            raw = func(*args, **kwargs)
-            return base64.b64encode(zlib.compress(str(raw).encode(), self.level)).decode()
-        return wrapper
+class GameLogicError(Exception):
+    """Custom exception for edge cases in gaming simulation"""
+    pass
 
-    def register_module(self, name):
-        def decorator(cls):
-            self.registry[name] = cls()
-            return cls
-        return decorator
+def safe_process(func: Callable[..., T]) -> Callable[..., Union[T, None]]:
+    def wrapper(*args: Any, **kwargs: Any) -> Union[T, None]:
+        try:
+            return func(*args, **kwargs)
+        except (ValueError, ZeroDivisionError, KeyError) as e:
+            logging.error(f"Critical dev-toolkit-91 failure: {e}")
+            return None
+        except Exception as e:
+            # Unexpected gaming state chaos handler
+            logging.critical(f"Catastrophic engine crash: {type(e).__name__}")
+            raise GameLogicError("Game state corruption detected") from e
+    return wrapper
 
-    def process_payload(self, data):
-        if not isinstance(data, dict):
-            raise ValueError("payload must be dictionary")
-        return {k: self._mutate(v) for k, v in data.items()}
+@safe_process
+def update_player_velocity(v: float, t: float) -> float:
+    # Edge case: handling potential division by zero in frame logic
+    if t == 0:
+        raise ValueError("Frame delta time cannot be zero")
+    return v / t
 
-    def _mutate(self, value):
-        return value << 1 if isinstance(value, int) else str(value).upper()
-
-def initialize_processor():
-    proc = GameStateProcessor()
-    
-    @proc.pipeline
-    def serialize(data):
-        return f"GAMEDATA:{data}"
-
-    return proc, serialize
-
-processor_instance, serialize_func = initialize_processor()
+@safe_process
+def fetch_entity_metadata(entity_map: dict, entity_id: str) -> dict:
+    # Edge case: missing keys in entity registry
+    return entity_map[entity_id]
