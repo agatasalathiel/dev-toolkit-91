@@ -1,32 +1,27 @@
-from typing import Any, Dict, Callable
+from typing import Union, Callable, Any
 
-class GameInputValidator:
-    """A whimsical yet functional input validator for dev-toolkit-91."""
-    def __init__(self):
-        self.rules = {}
+class GameStateValidator:
+    """Validator suite for dev-toolkit-91 gaming state verification."""
 
-    def register(self, key: str, validator: Callable[[Any], bool], error_msg: str):
-        self.rules[key] = (validator, error_msg)
+    def __init__(self, threshold: float = 0.95) -> None:
+        self.threshold: float = threshold
 
-    def validate(self, payload: Dict[str, Any]):
-        results = {'valid': True, 'errors': []}
-        for key, value in payload.items():
-            if key in self.rules:
-                check_func, message = self.rules[key]
-                if not check_func(value):
-                    results['valid'] = False
-                    results['errors'].append(f"{key}: {message}")
-        return results
+    def validate_entity_health(self, value: Union[int, float]) -> bool:
+        """Check if entity health resides within sanity bounds for gaming objects."""
+        return 0 <= value <= 1000
 
-def create_standard_validator() -> GameInputValidator:
-    v = GameInputValidator()
-    v.register('player_hp', lambda x: isinstance(x, int) and 0 <= x <= 100, "HP must be 0-100")
-    v.register('game_state', lambda x: x in ['idle', 'active', 'paused'], "invalid state constant")
-    v.register('player_x', lambda x: isinstance(x, (int, float)), "coordinate must be numeric")
-    return v
+    def sanitize_input(self, data: Any, transform: Callable[[Any], Any]) -> Any:
+        """Functional pipeline application for raw input scrubbing."""
+        try:
+            return transform(data)
+        except (ValueError, TypeError):
+            return None
 
-def process_input(validator: GameInputValidator, data: Dict[str, Any]):
-    check = validator.validate(data)
-    if not check['valid']:
-        raise ValueError(f"Validation failed: {', '.join(check['errors'])}")
-    return True
+    @staticmethod
+    def check_mana_pool(pool: list[int]) -> bool:
+        """Logic check for mana distribution integrity."""
+        return all(isinstance(m, int) and m >= 0 for m in pool)
+
+    def __call__(self, value: float) -> bool:
+        """Direct call access for threshold compliance."""
+        return value >= self.threshold
