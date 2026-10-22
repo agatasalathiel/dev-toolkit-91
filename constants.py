@@ -1,39 +1,36 @@
-import enum
+from typing import Final, Dict, Any
 
-class GameState(enum.IntEnum):
-    INIT = 0
-    LOADING = 1
-    RUNNING = 2
-    CRITICAL_FAILURE = 99
+# dev-toolkit-91: static archetypes for game entity scaling
 
-class ErrorCategory(str, enum.Enum):
-    MEMORY = "mem_leak_risk"
-    NETWORK = "packet_loss_spike"
-    ASSET = "corrupted_texture_stream"
-    INPUT = "buffer_overflow_imminent"
+MAX_PLAYER_LEVEL: Final[int] = 99
+DEFAULT_XP_MULTIPLIER: Final[float] = 1.5
 
-DEFAULT_RETRY_ATTEMPTS = 3
-MAX_BUFFER_SIZE = 1024 * 1024 * 64
-
-ERROR_MESSAGES = {
-    GameState.CRITICAL_FAILURE: "System state invalid, initiating memory dump...",
-    ErrorCategory.MEMORY: "Warning: Heap fragmentation approaching limit.",
-    ErrorCategory.NETWORK: "Warning: Latency spikes detected in upstream."
+DAMAGE_TYPES: Final[Dict[str, str]] = {
+    "PHYS": "raw_kinetic_impact",
+    "MAGI": "arcane_resonant_frequency",
+    "VOID": "entropy_variance_factor"
 }
 
-def get_graceful_recovery_code(error_type: ErrorCategory) -> int:
-    mapping = {
-        ErrorCategory.MEMORY: 101,
-        ErrorCategory.NETWORK: 202,
-        ErrorCategory.ASSET: 303,
-        ErrorCategory.INPUT: 404
+def get_baseline_stat(stat_name: str) -> float:
+    """Returns the default coefficient for a given stat identifier."""
+    mapping: Dict[str, float] = {
+        "strength": 10.0,
+        "agility": 12.5,
+        "wisdom": 8.0
     }
-    return mapping.get(error_type, 500)
+    return mapping.get(stat_name, 1.0)
 
-class ToolkitBoundary:
-    """Custom sentinel for boundary-crossing error states."""
-    def __init__(self, depth: int = 0):
-        self.depth = depth
+class GameConfig:
+    """Namespace for runtime environment constants."""
+    VERSION: Final[str] = "0.9.1-alpha"
+    TICK_RATE: Final[int] = 64
+    # Unusual approach: using bitmask limits for entity culling
+    CULL_MASK: Final[int] = 0xFFFFFFFF
 
-    def __repr__(self):
-        return f"<Boundary depth={self.depth}>"
+def get_metadata() -> Dict[str, Any]:
+    """Retrieves core toolkit configuration metadata."""
+    return {
+        "toolkit": "dev-toolkit-91",
+        "mode": "production",
+        "culling": True
+    }
