@@ -1,49 +1,53 @@
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+
 # dev-toolkit-91
 
-`dev-toolkit-91` is a robust Python-based CLI utility designed to streamline game development workflows and asset management. It provides modular automation for developers looking to bridge the gap between engine prototyping and production-ready code.
+`dev-toolkit-91` is a high-performance Python library designed to streamline asset pipelines and engine telemetry for 2D game development. It simplifies texture atlas generation, parses TMX tilemaps into memory-efficient structures, and provides real-time frame budget monitoring for Pygame and Arcade applications.
 
-### Features
-*   **Asset Pipeline Automation:** Automatically optimizes textures and compresses audio files for direct engine integration.
-*   **Engine Hook-in:** Rapidly initializes boilerplates for common Python-based frameworks like Pygame and Arcade.
-*   **Data Serialization Engine:** Simplifies the translation of JSON/YAML configuration files into typed Python dataclasses for game state management.
-*   **Build Validator:** Runs automated sanity checks on directory structures to prevent common deployment failures.
+## Features
 
-### Installation
+* **Automated Sprite Slicing:** Extracts individual animation frames from single RGBA sprite sheets with dynamic padding detection.
+* **Fast TMX Map Loader:** Converts Tiled XML map exports into optimized NumPy collision arrays for rapid raycasting and spatial partitioning.
+* **Frame Budget Telemetry:** Measures function-level render bottleneck metrics with low-overhead profiling decorators.
+* **Texture Atlas Packer:** Combines loose PNG assets into packed spritesheet textures with coordinate JSON mapping to minimize GPU draw calls.
 
-Ensure you have Python 3.8+ installed. You can install the toolkit via pip:
+## Installation
+
+Install the package via pip:
 
 ```bash
-# Clone the repository
+pip install dev-toolkit-91
+```
+
+For source builds and developer dependencies:
+
+```bash
 git clone https://github.com/Developer/dev-toolkit-91.git
 cd dev-toolkit-91
-
-# Install requirements
-pip install -r requirements.txt
-
-# Install the package locally
-pip install .
+pip install -e .[dev]
 ```
 
-### Usage
+## Quick Start
 
-Once installed, use the command-line interface to initialize your project structure or process assets:
+```python
+from dev_toolkit_91 import AtlasPacker, FrameTracker
 
-```bash
-# Initialize a new game project directory
-dtk init --name "MyGameProject" --framework pygame
+# Track render pipeline performance
+tracker = FrameTracker(target_fps=60)
 
-# Batch process asset optimization
-dtk assets --input ./raw_assets --output ./dist --quality 85
+@tracker.profile
+def render_frame():
+    # Slices hero animation frames from atlas
+    packer = AtlasPacker(source_dir="./raw_assets")
+    atlas = packer.build(output_file="spritesheet.png")
+    frames = atlas.get_animation("hero_run")
+    return len(frames)
+
+if __name__ == "__main__":
+    frame_count = render_frame()
+    print(f"Loaded {frame_count} frames. Avg Frame Time: {tracker.avg_ms:.2f}ms")
 ```
 
-### Roadmap
-*   Support for automated unit testing in Pygame environments.
-*   Cross-platform build scripts for Windows/macOS exports.
-*   Integration with Steamworks SDK wrappers.
+## License
 
----
-
-### License
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-
-Distributed under the MIT License. See `LICENSE` for more information.
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
