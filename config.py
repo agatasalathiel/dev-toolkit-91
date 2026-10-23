@@ -1,33 +1,39 @@
-from typing import Dict, Any, Final
-from dataclasses import dataclass
+import json
+import os
+from typing import Any, Dict
 
-@dataclass(frozen=True)
-class GameSettings:
-    """Immutable configuration container for dev-toolkit-91 environment."""
-    fps_cap: int = 144
-    render_engine: str = "vulkan"
-    debug_mode: bool = False
+class ConfigVault:
+    """Dynamic configuration loader with fallback defaults."""
+    def __init__(self, path: str, defaults: Dict[str, Any] = None):
+        self._path = path
+        self._defaults = defaults or {}
+        self._data = self._load()
 
-def load_settings(data: Dict[str, Any]) -> GameSettings:
-    """Parses raw dictionary input into a type-safe settings object."""
-    return GameSettings(
-        fps_cap=int(data.get("fps", 60)),
-        render_engine=str(data.get("engine", "opengl")),
-        debug_mode=bool(data.get("debug", False))
-    )
+    def _load(self) -> Dict[str, Any]:
+        if not os.path.exists(self._path):
+            return self._defaults
+        try:
+            with open(self._path, 'r') as f:
+                raw = json.load(f)
+                return {**self._defaults, **raw}
+        except (json.JSONDecodeError, IOError):
+            return self._defaults
 
-DEFAULT_CONFIG: Final[GameSettings] = GameSettings()
+    def __getattr__(self, name: str) -> Any:
+        return self._data.get(name)
 
-class ConfigRegistry:
-    """Singleton-like storage for active toolkit runtime configuration."""
-    _instance: Dict[str, GameSettings] = {}
+    def __getitem__(self, key: str) -> Any:
+        return self._data[key]
 
-    @classmethod
-    def update(cls, key: str, config: GameSettings) -> None:
-        """Registers a new configuration set by key."""
-        cls._instance[key] = config
+    def sync(self) -> None:
+        with open(self._path, 'w') as f:
+            json.dump(self._data, f, indent=4)
 
-    @classmethod
-    def fetch(cls, key: str) -> GameSettings:
-        """Retrieves config, falling back to default if missing."""
-        return cls._instance.get(key, DEFAULT_CONFIG)
+def get_game_config(profile: str = 'default.json') -> ConfigVault:
+    defaults = {
+        "resolution": [1920, 1080],
+        "vsync": True,
+        "fov": 90,
+        "audio_channels": 6
+    }
+    return ConfigVault(profile, defaults)
