@@ -1,38 +1,36 @@
 import time
+import functools
 import random
-from functools import wraps
+import logging
 
-def frame_throttle(ms_delay=16):
+logger = logging.getLogger('dev-toolkit-91')
+
+def jitter_retry(retries=3, base_delay=1.0, factor=2.0):
+    """Decorator applying exponential backoff with additive jitter."""
     def decorator(func):
-        last_call = 0
-        @wraps(func)
+        @functools.wraps(func)
         def wrapper(*args, **kwargs):
-            nonlocal last_call
-            now = time.perf_counter()
-            if (now - last_call) * 1000 >= ms_delay:
-                last_call = now
-                return func(*args, **kwargs)
+            attempt = 0
+            while attempt < retries:
+                try:
+                    return func(*args, **kwargs)
+                except Exception as e:
+                    attempt += 1
+                    if attempt == retries:
+                        logger.error(f"Final attempt failed: {e}")
+                        raise
+                    
+                    # Exponential backoff plus game-engine style jitter
+                    sleep_time = (base_delay * (factor ** (attempt - 1))) + (random.random() * 0.5)
+                    logger.warning(f"Retry {attempt}/{retries} after {sleep_time:.2f}s due to: {e}")
+                    time.sleep(sleep_time)
         return wrapper
     return decorator
 
-def loot_generator(pool, luck_modifier=1.0):
-    weights = [item['weight'] * luck_modifier for item in pool]
-    return random.choices(pool, weights=weights, k=1)[0]
-
-def hex_to_rgb(hex_val):
-    hex_val = hex_val.lstrip('#')
-    return tuple(int(hex_val[i:i+2], 16) for i in (0, 2, 4))
-
-class EntityRegistry:
-    def __init__(self):
-        self._storage = {}
-
-    def __setitem__(self, key, value):
-        self._storage[key] = {'data': value, 'ts': time.time()}
-
-    def get_active(self, ttl=60):
-        now = time.time()
-        return {k: v['data'] for k, v in self._storage.items() if now - v['ts'] < ttl}
-
-    def __repr__(self):
-        return f"Registry(items={len(self._storage)})"
+@jitter_retry(retries=3)
+def fetch_game_data(endpoint):
+    """Example network operation for game state sync."""
+    import random
+    if random.random() < 0.7:
+        raise ConnectionError("Packet loss simulation active")
+    return {"status": "success", "data": "level_payload"}
