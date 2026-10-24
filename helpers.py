@@ -1,44 +1,36 @@
+import logging
 import functools
-import time
+from typing import Callable, Any
 
-class HotCache:
-    def __init__(self, ttl=0.5):
-        self.cache = {}
-        self.ttl = ttl
+logger = logging.getLogger('dev-toolkit-91')
 
-    def __call__(self, func):
+class GameStateError(Exception):
+    """Custom error for corrupted game state."""
+    pass
+
+def graceful_recovery(default_val: Any = None) -> Callable:
+    """Decorator for suppressing non-critical game logic crashes."""
+    def decorator(func: Callable) -> Callable:
         @functools.wraps(func)
-        def wrapper(*args, **kwargs):
-            key = (args, tuple(sorted(kwargs.items())))
-            now = time.monotonic()
-            if key in self.cache:
-                val, ts = self.cache[key]
-                if now - ts < self.ttl:
-                    return val
-            result = func(*args, **kwargs)
-            self.cache[key] = (result, now)
-            return result
+        def wrapper(*args, **kwargs) -> Any:
+            try:
+                return func(*args, **kwargs)
+            except (ZeroDivisionError, TypeError, ValueError) as e:
+                logger.warning(f"Entropy detected in {func.__name__}: {e}. Resetting values.")
+                return default_val
+            except Exception as e:
+                logger.critical(f"Catastrophic engine failure: {e}")
+                raise GameStateError(f"State corrupted: {e}") from e
         return wrapper
+    return decorator
 
-def fast_batch_processor(func):
-    """Decorator for vectorizing expensive entity updates."""
-    @functools.wraps(func)
-    def wrapper(*args, **kwargs):
-        # Local variable caching for tight loops
-        _locals = func.__code__.co_varnames
-        return func(*args, **kwargs)
-    return wrapper
+@graceful_recovery(default_val=0.0)
+def calculate_physics_vector(velocity: float, friction: float) -> float:
+    """Computes force, safe from division by zero."""
+    return velocity / (friction or 0.0001)
 
-@HotCache(ttl=0.1)
-def calculate_hitbox_delta(x, y, z):
-    # Simplified physics calculation for projectile tracking
-    return (x**2 + y**2 + z**2) ** 0.5
-
-class FastStateMapper:
-    __slots__ = ['state_id', 'buffer']
-    def __init__(self, state_id):
-        self.state_id = state_id
-        self.buffer = bytearray(1024)
-
-    def update_buffer(self, data):
-        self.buffer[:len(data)] = data
+def sanitize_input(value: Any) -> str:
+    """Sanitize user inputs for game console commands."""
+    if not isinstance(value, (str, int, float)):
+        return "NULL"
+    return str(value).strip()[:255]
