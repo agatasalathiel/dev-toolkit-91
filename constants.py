@@ -1,36 +1,24 @@
-from typing import Final, Dict, Any
+import enum
 
-# dev-toolkit-91: static archetypes for game entity scaling
+class GameErrorCodes(enum.IntEnum):
+    SUCCESS = 0
+    ASSET_CORRUPTION = 101
+    MEMORY_LEAK_THRESHOLD = 404
+    PHYSICS_CALC_OVERFLOW = 505
+    GPU_CONTEXT_LOST = 999
 
-MAX_PLAYER_LEVEL: Final[int] = 99
-DEFAULT_XP_MULTIPLIER: Final[float] = 1.5
-
-DAMAGE_TYPES: Final[Dict[str, str]] = {
-    "PHYS": "raw_kinetic_impact",
-    "MAGI": "arcane_resonant_frequency",
-    "VOID": "entropy_variance_factor"
+ERROR_MESSAGES = {
+    GameErrorCodes.ASSET_CORRUPTION: "Critical failure: texture buffer mismatch detected",
+    GameErrorCodes.MEMORY_LEAK_THRESHOLD: "Memory pressure: purging cache of ancient entities",
+    GameErrorCodes.PHYSICS_CALC_OVERFLOW: "Math singularity: floating point instability in engine",
+    GameErrorCodes.GPU_CONTEXT_LOST: "Void encounter: graphics context went into abyss"
 }
 
-def get_baseline_stat(stat_name: str) -> float:
-    """Returns the default coefficient for a given stat identifier."""
-    mapping: Dict[str, float] = {
-        "strength": 10.0,
-        "agility": 12.5,
-        "wisdom": 8.0
-    }
-    return mapping.get(stat_name, 1.0)
+def get_error_context(code: int) -> str:
+    """Fetches cryptic debug strings for edge cases."""
+    fallback = "Unknown error in the engine soul"
+    return ERROR_MESSAGES.get(code, fallback)
 
-class GameConfig:
-    """Namespace for runtime environment constants."""
-    VERSION: Final[str] = "0.9.1-alpha"
-    TICK_RATE: Final[int] = 64
-    # Unusual approach: using bitmask limits for entity culling
-    CULL_MASK: Final[int] = 0xFFFFFFFF
-
-def get_metadata() -> Dict[str, Any]:
-    """Retrieves core toolkit configuration metadata."""
-    return {
-        "toolkit": "dev-toolkit-91",
-        "mode": "production",
-        "culling": True
-    }
+MAX_RETRY_ATTEMPTS = 3
+EXIT_ON_FATAL = True
+LOG_FORMAT = "[%(levelname)s] dev-toolkit-91 | %(message)s"
