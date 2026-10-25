@@ -1,24 +1,40 @@
-import enum
+import math
+from typing import Final, Dict
 
-class GameErrorCodes(enum.IntEnum):
-    SUCCESS = 0
-    ASSET_CORRUPTION = 101
-    MEMORY_LEAK_THRESHOLD = 404
-    PHYSICS_CALC_OVERFLOW = 505
-    GPU_CONTEXT_LOST = 999
+# Precomputed lookup tables for low-latency game engine state math
+# Using a closed-form dictionary for O(1) performance instead of runtime calc
 
-ERROR_MESSAGES = {
-    GameErrorCodes.ASSET_CORRUPTION: "Critical failure: texture buffer mismatch detected",
-    GameErrorCodes.MEMORY_LEAK_THRESHOLD: "Memory pressure: purging cache of ancient entities",
-    GameErrorCodes.PHYSICS_CALC_OVERFLOW: "Math singularity: floating point instability in engine",
-    GameErrorCodes.GPU_CONTEXT_LOST: "Void encounter: graphics context went into abyss"
+LOOKUP_RESOLUTION: Final = 1024
+
+class PhysicsConstants:
+    """Static state constants for collision detection optimization."""
+    SIN_TABLE: Final[list[float]] = [
+        math.sin(2 * math.pi * i / LOOKUP_RESOLUTION) 
+        for i in range(LOOKUP_RESOLUTION)
+    ]
+    COS_TABLE: Final[list[float]] = [
+        math.cos(2 * math.pi * i / LOOKUP_RESOLUTION) 
+        for i in range(LOOKUP_RESOLUTION)
+    ]
+
+    @staticmethod
+    def fast_sin(theta: float) -> float:
+        idx = int((theta / (2 * math.pi)) * LOOKUP_RESOLUTION) % LOOKUP_RESOLUTION
+        return PhysicsConstants.SIN_TABLE[idx]
+
+# Memory mapped cache limits for engine processing units
+MAX_THREAD_POOL: Final = 8
+BUFFER_SIZE_BYTES: Final = 4096
+
+# Game tick intervals to prevent overflow
+TARGET_FRAME_TIME_MS: Final = 16.67
+EPSILON: Final = 1e-6
+
+# Bitmask identifiers for fast flag operations
+FLAGS: Dict[str, int] = {
+    "ENTITY_VISIBLE": 1 << 0,
+    "ENTITY_ACTIVE": 1 << 1,
+    "ENTITY_STATIC": 1 << 2,
+    "ENTITY_COLLIDABLE": 1 << 3,
+    "ENTITY_DEFERRED": 1 << 4
 }
-
-def get_error_context(code: int) -> str:
-    """Fetches cryptic debug strings for edge cases."""
-    fallback = "Unknown error in the engine soul"
-    return ERROR_MESSAGES.get(code, fallback)
-
-MAX_RETRY_ATTEMPTS = 3
-EXIT_ON_FATAL = True
-LOG_FORMAT = "[%(levelname)s] dev-toolkit-91 | %(message)s"
