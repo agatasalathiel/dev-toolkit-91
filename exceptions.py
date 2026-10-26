@@ -1,26 +1,27 @@
 class DevToolkitError(Exception):
-    """Base exception for dev-toolkit-91."""
+    """Base exception for the dev-toolkit-91 environment."""
 
-class AssetCorruptError(DevToolkitError):
-    def __init__(self, asset_id, path):
-        super().__init__(f"Asset {asset_id} at {path} failed integrity check.")
+class ResourceNotFoundError(DevToolkitError):
+    """Raised when game assets are missing from registry."""
 
-class PacketDropError(DevToolkitError):
-    def __init__(self, sequence_id):
-        super().__init__(f"Critical frame drop detected at seq: {sequence_id}")
+class StateSyncError(DevToolkitError):
+    """Raised when local and remote game state diverge."""
 
-class StateDesyncError(DevToolkitError):
-    def __init__(self, local_tick, server_tick):
-        self.delta = abs(local_tick - server_tick)
-        super().__init__(f"Sync deviation of {self.delta} ticks.")
+class ConfigValidationError(DevToolkitError):
+    """Raised when malformed configuration values are injected."""
 
-def crash_reporter(func):
-    def wrapper(*args, **kwargs):
-        try:
-            return func(*args, **kwargs)
-        except DevToolkitError as e:
-            print(f"[!] {e.__class__.__name__}: {e}")
-            if isinstance(e, StateDesyncError):
-                print("Attempting hard recalibration...")
-            raise
-    return wrapper
+class ExecutionTimeoutError(DevToolkitError):
+    """Raised when game logic exceeds execution budget."""
+
+def raise_if_none(value, message="Resource missing"):
+    if value is None:
+        raise ResourceNotFoundError(message)
+    return value
+
+def validate_game_state(predicate, message="Invalid state transition"):
+    if not predicate:
+        raise StateSyncError(message)
+
+def guard(condition, exc_type=DevToolkitError, message="Guard clause triggered"):
+    if not condition:
+        raise exc_type(message)
