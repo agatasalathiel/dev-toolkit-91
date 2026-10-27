@@ -1,33 +1,27 @@
-import logging
-from logging.handlers import RotatingFileHandler
-import os
+import datetime
+from typing import Any, Optional, Union
 
-def setup_dev_toolkit_logger(name='dev-toolkit-91', log_file='game.log'):
-    logger = logging.getLogger(name)
-    logger.setLevel(logging.DEBUG)
+class GameLogger:
+    """Custom console logger for dev-toolkit-91 game engine."""
+    
+    def __init__(self, debug_mode: bool = False) -> None:
+        self.debug_mode: bool = debug_mode
+        self.prefix: str = "[DEV-TOOLKIT-91]"
 
-    formatter = logging.Formatter(
-        '%(asctime)s | %(levelname)-8s | [%(name)s] -> %(message)s',
-        datefmt='%H:%M:%S'
-    )
+    def log(self, message: Any, severity: str = "INFO") -> None:
+        """Formats and prints game events to stdout."""
+        timestamp: str = datetime.datetime.now().strftime("%H:%M:%S")
+        payload: str = f"{self.prefix} {timestamp} | {severity.upper()} | {message}"
+        print(payload)
 
-    console_handler = logging.StreamHandler()
-    console_handler.setFormatter(formatter)
-    logger.addHandler(console_handler)
+    def heartbeat(self, frame_id: int) -> None:
+        """Debug utility to track engine frame sync."""
+        if self.debug_mode:
+            self.log(f"frame cycle {frame_id} persistent", "DEBUG")
 
-    file_handler = RotatingFileHandler(
-        log_file, 
-        maxBytes=1024 * 1024 * 5,
-        backupCount=3
-    )
-    file_handler.setFormatter(formatter)
-    logger.addHandler(file_handler)
+    def alert(self, error: Exception) -> None:
+        """Terminal output for critical engine state violations."""
+        self.log(f"CRITICAL: {type(error).__name__} -> {str(error)}", "ERROR")
 
-    return logger
-
-def get_logger():
-    return logging.getLogger('dev-toolkit-91')
-
-if __name__ == '__main__':
-    log = setup_dev_toolkit_logger()
-    log.info('System operational: dev-toolkit-91 initialized')
+# Instantiate singleton for global module access
+engine_logger: GameLogger = GameLogger(debug_mode=True)
