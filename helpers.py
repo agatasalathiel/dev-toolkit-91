@@ -1,36 +1,43 @@
-import logging
-import functools
-from typing import Callable, Any
+"""Gaming helper utilities for dynamic stat modifier chains and experience scaling."""
 
-logger = logging.getLogger('dev-toolkit-91')
+from dataclasses import dataclass
+from functools import reduce
+import math
+from typing import Callable, Generator, Tuple, TypeVar
 
-class GameStateError(Exception):
-    """Custom error for corrupted game state."""
-    pass
+T = TypeVar("T", int, float)
+StatModifier = Callable[[float], float]
 
-def graceful_recovery(default_val: Any = None) -> Callable:
-    """Decorator for suppressing non-critical game logic crashes."""
-    def decorator(func: Callable) -> Callable:
-        @functools.wraps(func)
-        def wrapper(*args, **kwargs) -> Any:
-            try:
-                return func(*args, **kwargs)
-            except (ZeroDivisionError, TypeError, ValueError) as e:
-                logger.warning(f"Entropy detected in {func.__name__}: {e}. Resetting values.")
-                return default_val
-            except Exception as e:
-                logger.critical(f"Catastrophic engine failure: {e}")
-                raise GameStateError(f"State corrupted: {e}") from e
-        return wrapper
-    return decorator
 
-@graceful_recovery(default_val=0.0)
-def calculate_physics_vector(velocity: float, friction: float) -> float:
-    """Computes force, safe from division by zero."""
-    return velocity / (friction or 0.0001)
+@dataclass(frozen=True)
+class StatChain:
+    """Immutable pipeline of stat modifiers evaluated sequentially via operator overloading."""
 
-def sanitize_input(value: Any) -> str:
-    """Sanitize user inputs for game console commands."""
-    if not isinstance(value, (str, int, float)):
-        return "NULL"
-    return str(value).strip()[:255]
+    base_value: float
+    modifiers: Tuple[StatModifier, ...] = ()
+
+    def __add__(self, modifier: StatModifier) -> "StatChain":
+        """Appends a modifier function into the chain using the addition operator."""
+        return StatChain(self.base_value, self.modifiers + (modifier,))
+
+    def resolve(self) -> float:
+        """Evaluates the entire chain and returns the final calculated attribute value."""
+        return reduce(lambda val, mod: mod(val), self.modifiers, self.base_value)
+
+
+def build_buff_multiplier(percent: float) -> StatModifier:
+    """Creates a percentage-based scaling modifier for game entity attributes."""
+    return lambda value: value * (1.0 + percent / 100.0)
+
+
+def calculate_experience_curve(
+    target_level: int,
+    base_xp: int = 100,
+    exponent: float = 1.5
+) -> Generator[Tuple[int, int], None, None]:
+    """Yields level milestone and cumulative experience points required up to target level."""
+    accumulated_xp = 0
+    for current_lvl in range(1, target_level + 1):
+        required = math.floor(base_xp * (current_lvl ** exponent))
+        accumulated_xp += required
+        yield current_lvl, accumulated_xp
