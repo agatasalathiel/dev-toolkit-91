@@ -1,27 +1,33 @@
-import datetime
-from typing import Any, Optional, Union
+import logging
+from logging.handlers import RotatingFileHandler
+import os
 
-class GameLogger:
-    """Custom console logger for dev-toolkit-91 game engine."""
+def setup_dev_logger(name: str = 'dev-toolkit-91', log_file: str = 'toolkit.log') -> logging.Logger:
+    logger = logging.getLogger(name)
+    logger.setLevel(logging.DEBUG)
     
-    def __init__(self, debug_mode: bool = False) -> None:
-        self.debug_mode: bool = debug_mode
-        self.prefix: str = "[DEV-TOOLKIT-91]"
+    if logger.hasHandlers():
+        logger.handlers.clear()
 
-    def log(self, message: Any, severity: str = "INFO") -> None:
-        """Formats and prints game events to stdout."""
-        timestamp: str = datetime.datetime.now().strftime("%H:%M:%S")
-        payload: str = f"{self.prefix} {timestamp} | {severity.upper()} | {message}"
-        print(payload)
+    formatter = logging.Formatter(
+        '%(asctime)s | %(levelname)-8s | [dev-kit] %(message)s',
+        datefmt='%H:%M:%S'
+    )
 
-    def heartbeat(self, frame_id: int) -> None:
-        """Debug utility to track engine frame sync."""
-        if self.debug_mode:
-            self.log(f"frame cycle {frame_id} persistent", "DEBUG")
+    file_handler = RotatingFileHandler(
+        log_file, 
+        maxBytes=1024 * 1024 * 5, 
+        backupCount=3
+    )
+    file_handler.setFormatter(formatter)
 
-    def alert(self, error: Exception) -> None:
-        """Terminal output for critical engine state violations."""
-        self.log(f"CRITICAL: {type(error).__name__} -> {str(error)}", "ERROR")
+    console_handler = logging.StreamHandler()
+    console_handler.setFormatter(formatter)
 
-# Instantiate singleton for global module access
-engine_logger: GameLogger = GameLogger(debug_mode=True)
+    logger.addHandler(file_handler)
+    logger.addHandler(console_handler)
+    
+    return logger
+
+# gaming-centric shortcut
+log = setup_dev_logger()
