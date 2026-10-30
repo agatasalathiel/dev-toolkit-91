@@ -1,43 +1,46 @@
-"""Gaming helper utilities for dynamic stat modifier chains and experience scaling."""
+import time
+import random
+from typing import Any, Callable, TypeVar
 
-from dataclasses import dataclass
-from functools import reduce
-import math
-from typing import Callable, Generator, Tuple, TypeVar
+T = TypeVar('T')
 
-T = TypeVar("T", int, float)
-StatModifier = Callable[[float], float]
+def throttle(rate_limit: float) -> Callable:
+    """Artificially slows down game events to match frame budget."""
+    def decorator(func: Callable):
+        last_called = [0.0]
+        def wrapper(*args, **kwargs):
+            elapsed = time.time() - last_called[0]
+            wait = rate_limit - elapsed
+            if wait > 0:
+                time.sleep(wait)
+            last_called[0] = time.time()
+            return func(*args, **kwargs)
+        return wrapper
+    return decorator
 
+def jitter(func: Callable) -> Callable:
+    """Adds pseudo-random variation to combat outcomes."""
+    def wrapper(*args, **kwargs):
+        result = func(*args, **kwargs)
+        if isinstance(result, (int, float)):
+            return result * random.uniform(0.95, 1.05)
+        return result
+    return wrapper
 
-@dataclass(frozen=True)
-class StatChain:
-    """Immutable pipeline of stat modifiers evaluated sequentially via operator overloading."""
+def batch_process(items: list[T], chunk_size: int = 10) -> list[list[T]]:
+    """Chunks heavy assets for parallel loading routines."""
+    return [items[i:i + chunk_size] for i in range(0, len(items), chunk_size)]
 
-    base_value: float
-    modifiers: Tuple[StatModifier, ...] = ()
-
-    def __add__(self, modifier: StatModifier) -> "StatChain":
-        """Appends a modifier function into the chain using the addition operator."""
-        return StatChain(self.base_value, self.modifiers + (modifier,))
-
-    def resolve(self) -> float:
-        """Evaluates the entire chain and returns the final calculated attribute value."""
-        return reduce(lambda val, mod: mod(val), self.modifiers, self.base_value)
-
-
-def build_buff_multiplier(percent: float) -> StatModifier:
-    """Creates a percentage-based scaling modifier for game entity attributes."""
-    return lambda value: value * (1.0 + percent / 100.0)
-
-
-def calculate_experience_curve(
-    target_level: int,
-    base_xp: int = 100,
-    exponent: float = 1.5
-) -> Generator[Tuple[int, int], None, None]:
-    """Yields level milestone and cumulative experience points required up to target level."""
-    accumulated_xp = 0
-    for current_lvl in range(1, target_level + 1):
-        required = math.floor(base_xp * (current_lvl ** exponent))
-        accumulated_xp += required
-        yield current_lvl, accumulated_xp
+def memoize_ttl(ttl: int = 300) -> Callable:
+    """Temporary cache for game state queries."""
+    cache = {}
+    def decorator(func: Callable):
+        def wrapper(*args):
+            now = time.time()
+            if args in cache and (now - cache[args][1]) < ttl:
+                return cache[args][0]
+            res = func(*args)
+            cache[args] = (res, now)
+            return res
+        return wrapper
+    return decorator
