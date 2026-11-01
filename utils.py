@@ -1,37 +1,38 @@
-import time
-import functools
-import random
 import logging
+import functools
 
 logger = logging.getLogger('dev-toolkit-91')
 
-def retry_with_backoff(max_attempts=3, base_delay=1.0, jitter=True):
-    def decorator(func):
-        @functools.wraps(func)
-        def wrapper(*args, **kwargs):
-            attempts = 0
-            while attempts < max_attempts:
-                try:
-                    return func(*args, **kwargs)
-                except Exception as e:
-                    attempts += 1
-                    if attempts == max_attempts:
-                        logger.error(f'Critical failure after {max_attempts} attempts: {e}')
-                        raise
-                    
-                    delay = base_delay * (2 ** (attempts - 1))
-                    if jitter:
-                        delay *= random.uniform(0.5, 1.5)
-                    
-                    logger.warning(f'Attempt {attempts} failed, retrying in {delay:.2f}s...')
-                    time.sleep(delay)
-        return wrapper
-    return decorator
+class GameLogicError(Exception):
+    pass
 
-class NetworkInterface:
-    @retry_with_backoff(max_attempts=4)
-    def fetch_game_data(self, endpoint):
-        # Simulated volatile network environment
-        if random.random() < 0.7:
-            raise ConnectionError('Packet loss encountered')
-        return {'status': 'success', 'data': 'payload_0x91'}
+def robust_processor(func):
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except (TypeError, ValueError, IndexError, ZeroDivisionError) as e:
+            logger.error(f'Edge case detected in {func.__name__}: {e}')
+            return None
+        except Exception as e:
+            logger.critical(f'Unexpected critical state: {e}')
+            raise GameLogicError('Fatal toolkit state corruption') from e
+    return wrapper
+
+@robust_processor
+def calculate_hit_chance(raw_val, base_offset):
+    # Protects against floating point precision and invalid input types
+    if not isinstance(raw_val, (int, float)):
+        raise ValueError('non-numeric hit data')
+    return min(max(float(raw_val) + base_offset, 0.0), 1.0)
+
+@robust_processor
+def parse_entity_id(entity_string):
+    # Handles malformed game entity strings
+    return int(entity_string.split('_')[-1])
+
+def safe_execute_task(task_queue, default_val=0):
+    try:
+        return task_queue.pop(0)
+    except (AttributeError, IndexError):
+        return default_val
