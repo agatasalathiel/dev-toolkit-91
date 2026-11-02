@@ -1,38 +1,29 @@
-import logging
+import time
 import functools
+import random
+from typing import Callable, Any
 
-logger = logging.getLogger('dev-toolkit-91')
-
-class GameLogicError(Exception):
-    pass
-
-def robust_processor(func):
-    @functools.wraps(func)
-    def wrapper(*args, **kwargs):
-        try:
-            return func(*args, **kwargs)
-        except (TypeError, ValueError, IndexError, ZeroDivisionError) as e:
-            logger.error(f'Edge case detected in {func.__name__}: {e}')
+def exponential_backoff(max_retries: int = 3, base_delay: float = 0.5):
+    def decorator(func: Callable):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            retries = 0
+            while retries < max_retries:
+                try:
+                    return func(*args, **kwargs)
+                except Exception as e:
+                    retries += 1
+                    if retries >= max_retries:
+                        raise e
+                    sleep_time = (base_delay * (2 ** (retries - 1))) + (random.random() * 0.1)
+                    time.sleep(sleep_time)
             return None
-        except Exception as e:
-            logger.critical(f'Unexpected critical state: {e}')
-            raise GameLogicError('Fatal toolkit state corruption') from e
-    return wrapper
+        return wrapper
+    return decorator
 
-@robust_processor
-def calculate_hit_chance(raw_val, base_offset):
-    # Protects against floating point precision and invalid input types
-    if not isinstance(raw_val, (int, float)):
-        raise ValueError('non-numeric hit data')
-    return min(max(float(raw_val) + base_offset, 0.0), 1.0)
-
-@robust_processor
-def parse_entity_id(entity_string):
-    # Handles malformed game entity strings
-    return int(entity_string.split('_')[-1])
-
-def safe_execute_task(task_queue, default_val=0):
-    try:
-        return task_queue.pop(0)
-    except (AttributeError, IndexError):
-        return default_val
+class NetworkInterface:
+    @exponential_backoff(max_retries=4)
+    def fetch_game_data(self, endpoint: str):
+        if random.random() < 0.7:
+            raise ConnectionError("Server lag detected in dev-toolkit-91")
+        return {"status": "success", "payload": "data_packet_0x42"}
