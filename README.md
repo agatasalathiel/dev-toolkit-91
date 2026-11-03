@@ -1,53 +1,54 @@
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
-
 # dev-toolkit-91
 
-`dev-toolkit-91` is a high-performance Python library designed to streamline asset pipelines and engine telemetry for 2D game development. It simplifies texture atlas generation, parses TMX tilemaps into memory-efficient structures, and provides real-time frame budget monitoring for Pygame and Arcade applications.
+`dev-toolkit-91` is a specialized Python library designed to streamline game asset processing and metadata management for independent developers. It automates tedious file conversions and API hooks to keep your project pipeline clean and efficient.
 
 ## Features
-
-* **Automated Sprite Slicing:** Extracts individual animation frames from single RGBA sprite sheets with dynamic padding detection.
-* **Fast TMX Map Loader:** Converts Tiled XML map exports into optimized NumPy collision arrays for rapid raycasting and spatial partitioning.
-* **Frame Budget Telemetry:** Measures function-level render bottleneck metrics with low-overhead profiling decorators.
-* **Texture Atlas Packer:** Combines loose PNG assets into packed spritesheet textures with coordinate JSON mapping to minimize GPU draw calls.
+*   **Sprite Sheet Optimizer:** Automatically crops, trims whitespace, and generates JSON texture atlases from raw image assets.
+*   **Discord Presence Sync:** Effortless integration with the Discord Rich Presence API to display real-time player stats and game states.
+*   **Config Parser:** A lightweight handler for structured `.yaml` and `.toml` configuration files with built-in validation for game balance variables.
+*   **Log Analytics:** An asynchronous logger that tracks engine performance metrics and crash reports directly to a local development dashboard.
 
 ## Installation
 
-Install the package via pip:
+Ensure you have Python 3.9+ installed. Install the toolkit via pip:
 
 ```bash
 pip install dev-toolkit-91
 ```
 
-For source builds and developer dependencies:
+To install from source for development purposes:
 
 ```bash
 git clone https://github.com/Developer/dev-toolkit-91.git
 cd dev-toolkit-91
-pip install -e .[dev]
+pip install -e .
 ```
 
-## Quick Start
+## Usage
+
+Quickly initialize the Discord Presence manager within your main game loop:
 
 ```python
-from dev_toolkit_91 import AtlasPacker, FrameTracker
+from dev_toolkit import DiscordManager
 
-# Track render pipeline performance
-tracker = FrameTracker(target_fps=60)
+# Initialize with your application client ID
+presence = DiscordManager(client_id="1234567890")
 
-@tracker.profile
-def render_frame():
-    # Slices hero animation frames from atlas
-    packer = AtlasPacker(source_dir="./raw_assets")
-    atlas = packer.build(output_file="spritesheet.png")
-    frames = atlas.get_animation("hero_run")
-    return len(frames)
+# Update game state dynamically
+presence.update(state="Exploring the Wasteland", details="Level 15")
+```
 
-if __name__ == "__main__":
-    frame_count = render_frame()
-    print(f"Loaded {frame_count} frames. Avg Frame Time: {tracker.avg_ms:.2f}ms")
+For advanced configuration parsing:
+
+```python
+from dev_toolkit import ConfigLoader
+
+# Automatically load and validate balance settings
+config = ConfigLoader.load("settings/balance.yaml")
+player_speed = config.get("player_speed", default=5.0)
 ```
 
 ## License
+![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
 
 This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
