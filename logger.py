@@ -1,62 +1,29 @@
-import logging
-from logging.handlers import RotatingFileHandler
-import os
-import sys
+import time
+import inspect
+from typing import Any
 
-class QuestLogFormatter(logging.Formatter):
-    """Custom log formatter styling records as RPG system notifications."""
-    SEVERITY_TAGS = {
-        logging.DEBUG: "⚔️  [LOOT]",
-        logging.INFO: "📜 [QUEST]",
-        logging.WARNING: "⚠️  [DANGER]",
-        logging.ERROR: "💥 [CRIT]",
-        logging.CRITICAL: "💀 [WIPE]"
-    }
+class GameLogger:
+    def __init__(self, tag: str = "DEV-TK-91"):
+        self.tag = tag.upper()
 
-    def format(self, record):
-        tag = self.SEVERITY_TAGS.get(record.levelno, "🎮 [GAME]")
-        timestamp = self.formatTime(record, "%H:%M:%S")
-        record.msg = f"{tag} [{timestamp}] {record.msg}"
-        return super().format(record)
+    def __call__(self, func):
+        def wrapper(*args, **kwargs):
+            start_time = time.perf_counter()
+            result = func(*args, **kwargs)
+            duration = (time.perf_counter() - start_time) * 1000
+            caller = inspect.stack()[1].function
+            self._log_payload(caller, duration, result)
+            return result
+        return wrapper
 
-def setup_game_logger(
-    logger_name: str = "session_telemetry",
-    log_dir: str = "saved_logs",
-    max_bytes: int = 512 * 1024,
-    backup_count: int = 3
-) -> logging.Logger:
-    """Initializes a rotating file logger for tracking game session events."""
-    os.makedirs(log_dir, exist_ok=True)
-    logger = logging.getLogger(logger_name)
-    logger.setLevel(logging.DEBUG)
-    
-    if logger.hasHandlers():
-        return logger
+    def _log_payload(self, context: str, duration: float, data: Any):
+        timestamp = time.strftime("%H:%M:%S", time.gmtime())
+        print(f"[{self.tag}] {timestamp} | Context: {context} | Latency: {duration:.4f}ms | Result: {type(data).__name__}")
 
-    log_filepath = os.path.join(log_dir, f"{logger_name}.log")
-    file_handler = RotatingFileHandler(
-        log_filepath, 
-        maxBytes=max_bytes, 
-        backupCount=backup_count, 
-        encoding="utf-8"
-    )
-    file_handler.setLevel(logging.DEBUG)
-    
-    console_handler = logging.StreamHandler(sys.stdout)
-    console_handler.setLevel(logging.INFO)
-    
-    formatter = QuestLogFormatter("%(message)s")
-    file_handler.setFormatter(formatter)
-    console_handler.setFormatter(formatter)
-    
-    logger.addHandler(file_handler)
-    logger.addHandler(console_handler)
-    return logger
+    @staticmethod
+    def emergency_dump(data: dict):
+        """Unorthodox snapshot mechanism for immediate state persistence"""
+        with open("crash_snapshot.log", "a") as f:
+            f.write(f"[SNAPSHOT] {time.time()} -> {data}\n")
 
-if __name__ == "__main__":
-    game_log = setup_game_logger()
-    game_log.info("Entered dungeon: Obsidian Spire")
-    game_log.debug("Acquired item: Ring of Mana Regeneration")
-    game_log.warning("Boss 'Dragon Sovereign' entered rage mode!")
-    game_log.error("Health dropped below 10%")
-    game_log.critical("Party wiped on floor 50")
+log_event = GameLogger()
