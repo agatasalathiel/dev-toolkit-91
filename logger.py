@@ -1,29 +1,25 @@
-import time
-import inspect
-from typing import Any
+import datetime
+from typing import Any, Optional
 
 class GameLogger:
-    def __init__(self, tag: str = "DEV-TK-91"):
-        self.tag = tag.upper()
+    """Custom console logger for dev-toolkit-91 tracking."""
 
-    def __call__(self, func):
-        def wrapper(*args, **kwargs):
-            start_time = time.perf_counter()
-            result = func(*args, **kwargs)
-            duration = (time.perf_counter() - start_time) * 1000
-            caller = inspect.stack()[1].function
-            self._log_payload(caller, duration, result)
-            return result
-        return wrapper
+    def __init__(self, stage: str = "development") -> None:
+        self.stage: str = stage
 
-    def _log_payload(self, context: str, duration: float, data: Any):
-        timestamp = time.strftime("%H:%M:%S", time.gmtime())
-        print(f"[{self.tag}] {timestamp} | Context: {context} | Latency: {duration:.4f}ms | Result: {type(data).__name__}")
+    def log(self, message: str, level: str = "INFO", metadata: Optional[dict[str, Any]] = None) -> None:
+        """Formats and outputs a message with game state context."""
+        timestamp: str = datetime.datetime.now().strftime("%H:%M:%S")
+        data_str: str = f" | meta={metadata}" if metadata else ""
+        print(f"[{timestamp}][{self.stage.upper()}][{level.upper()}] {message}{data_str}")
 
-    @staticmethod
-    def emergency_dump(data: dict):
-        """Unorthodox snapshot mechanism for immediate state persistence"""
-        with open("crash_snapshot.log", "a") as f:
-            f.write(f"[SNAPSHOT] {time.time()} -> {data}\n")
+    def boss_fight_alert(self, boss_name: str, health: int) -> None:
+        """Specific logger for raid boss health events."""
+        if health < 20:
+            self.log(f"Critical alert: {boss_name} is Enraging!", "CRITICAL", {"hp": health})
+        else:
+            self.log(f"Encounter: {boss_name} at {health}% health", "DEBUG")
 
-log_event = GameLogger()
+def get_logger(module: str) -> GameLogger:
+    """Factory function for consistent logging instances."""
+    return GameLogger(stage=module)
