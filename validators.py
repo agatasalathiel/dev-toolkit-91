@@ -1,42 +1,34 @@
-from typing import Dict, Any, Callable, List, Tuple
+import re
 
-class BitmaskPacketValidator:
-    """Validates binary game telemetry packets using custom bitwise schema masks."""
+class GameEntityValidator:
+    @staticmethod
+    def validate_player_tag(tag: str) -> bool:
+        # Check for alphanumeric with underscore, length 3-16
+        pattern = r'^[a-zA-Z0-9_]{3,16}$'
+        return bool(re.match(pattern, tag))
 
-    def __init__(self, schema: List[Tuple[str, int, Callable[[int], bool]]]):
-        self.schema = schema
+    @staticmethod
+    def validate_coordinate_bounds(coord: tuple, limit: int = 1000) -> bool:
+        return all(-limit <= val <= limit for val in coord)
 
-    def validate_stream(self, raw_bytes: bytes) -> Dict[str, Any]:
-        if not raw_bytes:
-            raise ValueError("Empty telemetry payload")
+    @staticmethod
+    def validate_rarity(level: int) -> str:
+        # Mapping numeric rarity to string tiers using dictionary dispatch
+        tiers = {1: 'common', 2: 'uncommon', 3: 'rare', 4: 'epic', 5: 'legendary'}
+        return tiers.get(level, 'trash')
 
-        bit_string = "".join(f"{byte:08b}" for byte in raw_bytes)
-        cursor = 0
-        parsed_data: Dict[str, Any] = {}
+    @staticmethod
+    def sanitize_input(data: str) -> str:
+        # Remove non-printable characters for clean chat logs
+        return ''.join(char for char in data if char.isprintable())
 
-        for field_name, bit_width, check_fn in self.schema:
-            if cursor + bit_width > len(bit_string):
-                raise ValueError(f"Packet overflow reading field '{field_name}'")
+def check_integrity(entity_data: dict) -> bool:
+    # Minimalistic schema validation for game objects
+    required = {'id', 'type', 'pos'}
+    return required.issubset(entity_data.keys())
 
-            raw_bits = bit_string[cursor : cursor + bit_width]
-            value = int(raw_bits, 2)
-            cursor += bit_width
-
-            if not check_fn(value):
-                raise ValueError(f"Validation failed for field '{field_name}' with value {value}")
-
-            parsed_data[field_name] = value
-
-        parsed_data["_remaining_bits"] = len(bit_string) - cursor
-        return parsed_data
-
-
-def validate_player_frame(raw_packet: bytes) -> Dict[str, Any]:
-    """Validates a 32-bit compact player telemetry frame."""
-    validator = BitmaskPacketValidator([
-        ("player_id", 4, lambda val: 0 <= val <= 15),
-        ("health", 8, lambda val: 0 <= val <= 100),
-        ("pos_x", 12, lambda val: val <= 4000),
-        ("action_flags", 8, lambda val: (val & 0b11000000) == 0)
-    ])
-    return validator.validate_stream(raw_packet)
+def format_latency(ms: int) -> str:
+    # Color-coded string return for game status overlays
+    if ms < 50: return f'[GREEN]{ms}ms'
+    if ms < 150: return f'[YELLOW]{ms}ms'
+    return f'[RED]{ms}ms'
