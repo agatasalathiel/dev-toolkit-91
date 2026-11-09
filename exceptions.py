@@ -1,27 +1,24 @@
-class DevToolkitError(Exception):
-    """Base exception for the dev-toolkit-91 environment."""
+from typing import Optional, Any
 
-class ResourceNotFoundError(DevToolkitError):
-    """Raised when game assets are missing from registry."""
+class ToolkitError(Exception):
+    """Base exception for the dev-toolkit-91 framework."""
+    def __init__(self, message: str, context: Optional[dict[str, Any]] = None) -> None:
+        self.context = context or {}
+        super().__init__(f"{message} | Context: {self.context}")
 
-class StateSyncError(DevToolkitError):
-    """Raised when local and remote game state diverge."""
+class GamingLogicError(ToolkitError):
+    """Raised when game state transitions reach invalid paths."""
+    pass
 
-class ConfigValidationError(DevToolkitError):
-    """Raised when malformed configuration values are injected."""
+class ResourceManifestError(ToolkitError):
+    """Raised when external game assets fail validation."""
+    pass
 
-class ExecutionTimeoutError(DevToolkitError):
-    """Raised when game logic exceeds execution budget."""
+def raise_with_context(exception_type: type[ToolkitError], msg: str, **kwargs: Any) -> None:
+    """Dynamic instantiation of toolkit exceptions with arbitrary kwargs."""
+    raise exception_type(msg, context=kwargs)
 
-def raise_if_none(value, message="Resource missing"):
-    if value is None:
-        raise ResourceNotFoundError(message)
-    return value
-
-def validate_game_state(predicate, message="Invalid state transition"):
-    if not predicate:
-        raise StateSyncError(message)
-
-def guard(condition, exc_type=DevToolkitError, message="Guard clause triggered"):
-    if not condition:
-        raise exc_type(message)
+class StateTransitionFailure(GamingLogicError):
+    """Specific error for failed tick updates in engine."""
+    def __init__(self, tick: int, reason: str) -> None:
+        super().__init__(f"Tick {tick} failed", {"reason": reason, "tick": tick})
