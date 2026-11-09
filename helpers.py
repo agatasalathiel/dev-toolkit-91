@@ -1,44 +1,28 @@
-import time
-import functools
 import random
+import time
+from typing import Any, Callable, TypeVar, List
 
-def throttle(interval=1.0):
-    def decorator(func):
-        last_called = [0.0]
-        @functools.wraps(func)
-        def wrapper(*args, **kwargs):
-            elapsed = time.time() - last_called[0]
-            if elapsed < interval:
-                return None
-            last_called[0] = time.time()
-            return func(*args, **kwargs)
-        return wrapper
-    return decorator
+T = TypeVar('T')
 
-def jitter_delay(base=0.1, variance=0.05):
-    time.sleep(base + (random.random() * variance))
+def jitter_delay(base_ms: int, variance: int = 50) -> None:
+    """Simulates human-like latency for game engine inputs."""
+    delay = (base_ms + random.randint(-variance, variance)) / 1000
+    time.sleep(max(0, delay))
 
-def chunk_list(data, size):
-    for i in range(0, len(data), size):
-        yield data[i:i + size]
+def chunk_game_state(data: List[T], size: int) -> List[List[T]]:
+    """Partition heavy state packets for transmission."""
+    return [data[i:i + size] for i in range(0, len(data), size)]
 
-def dict_deep_merge(base, update):
-    for key, value in update.items():
-        if isinstance(value, dict) and key in base:
-            dict_deep_merge(base[key], value)
-        else:
-            base[key] = value
-    return base
+def retry_operation(func: Callable[..., T], retries: int = 3) -> T:
+    """Resilient execution wrapper for unstable game hooks."""
+    for i in range(retries):
+        try:
+            return func()
+        except Exception as e:
+            if i == retries - 1:
+                raise e
+            time.sleep(0.1 * (2 ** i))
 
-def format_ticks(ticks, tps=60):
-    seconds = ticks / tps
-    m, s = divmod(seconds, 60)
-    return f"{int(m):02d}:{s:05.2f}"
-
-class GameStateContext:
-    def __init__(self, data=None):
-        self.data = data or {}
-    def __enter__(self):
-        return self.data
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self.data.clear()
+def sanitize_name(raw_name: str) -> str:
+    """Cleans player usernames by stripping control characters."""
+    return ''.join(c for c in raw_name if c.isalnum() or c in ' _-').strip()
