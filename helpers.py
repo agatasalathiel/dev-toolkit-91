@@ -1,28 +1,30 @@
-import random
 import time
-from typing import Any, Callable, TypeVar, List
+import functools
+import random
 
-T = TypeVar('T')
+def retry_gaming_op(max_attempts=3, delay=1.0, backoff=2.0):
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            attempts = 0
+            current_delay = delay
+            while attempts < max_attempts:
+                try:
+                    return func(*args, **kwargs)
+                except Exception as e:
+                    attempts += 1
+                    if attempts == max_attempts:
+                        raise e
+                    sleep_time = current_delay + random.uniform(0, 0.5)
+                    time.sleep(sleep_time)
+                    current_delay *= backoff
+            return None
+        return wrapper
+    return decorator
 
-def jitter_delay(base_ms: int, variance: int = 50) -> None:
-    """Simulates human-like latency for game engine inputs."""
-    delay = (base_ms + random.randint(-variance, variance)) / 1000
-    time.sleep(max(0, delay))
-
-def chunk_game_state(data: List[T], size: int) -> List[List[T]]:
-    """Partition heavy state packets for transmission."""
-    return [data[i:i + size] for i in range(0, len(data), size)]
-
-def retry_operation(func: Callable[..., T], retries: int = 3) -> T:
-    """Resilient execution wrapper for unstable game hooks."""
-    for i in range(retries):
-        try:
-            return func()
-        except Exception as e:
-            if i == retries - 1:
-                raise e
-            time.sleep(0.1 * (2 ** i))
-
-def sanitize_name(raw_name: str) -> str:
-    """Cleans player usernames by stripping control characters."""
-    return ''.join(c for c in raw_name if c.isalnum() or c in ' _-').strip()
+@retry_gaming_op(max_attempts=4, delay=0.5)
+def fetch_game_server_data(endpoint):
+    # Simulate volatile network condition
+    if random.random() < 0.7:
+        raise ConnectionError("server handshake failed")
+    return {"status": "online", "players": 42}
